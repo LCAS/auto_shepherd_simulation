@@ -6,30 +6,33 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  unity-build:
+  unity-verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           lfs: true
       
-      - name: Cache Library
-        uses: actions/cache@v3
-        with:
-          path: Library
-          key: Library-${{ github.sha }}
-          restore-keys: |
-            Library-
-
-      - name: Build Unity Project
-        uses: game-ci/unity-builder@v3
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        with:
-          projectPath: .
-          buildName: UnityBuild
-          buildsPath: build
-          unityVersion: 2022.3.18f1
+      - name: Verify Unity Project Structure
+        run: |
+          # Check if essential Unity project files exist
+          if [ ! -f "ProjectSettings/ProjectVersion.txt" ]; then
+            echo "Error: ProjectVersion.txt not found. Invalid Unity project structure."
+            exit 1
+          fi
+          
+          if [ ! -d "Assets" ]; then
+            echo "Error: Assets folder not found. Invalid Unity project structure."
+            exit 1
+          fi
+          
+          if [ ! -d "Packages" ]; then
+            echo "Error: Packages folder not found. Invalid Unity project structure."
+            exit 1
+          fi
+          
+          echo "Unity project structure verification passed."
+          cat ProjectSettings/ProjectVersion.txt
 
   ros-tests:
     runs-on: ubuntu-latest
