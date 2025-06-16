@@ -15,10 +15,17 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Prepare files for Docker build
+        run: |
+          mkdir -p docker_build/tests
+          cp ros_interface/ros_interface.py docker_build/
+          cp ros_interface/tests/test_ros_interface.py docker_build/tests/
+          cp ros_interface/Dockerfile.test docker_build/Dockerfile
+      
       - name: Build ROS Test Container
         run: |
-          cd ros_interface
-          docker build -t ros_test -f Dockerfile.test .
+          cd docker_build
+          docker build -t ros_test .
           
       - name: Run ROS Tests
         run: docker run ros_test 
