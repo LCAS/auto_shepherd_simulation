@@ -6,33 +6,30 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  unity-verify:
+  unity-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           lfs: true
       
-      - name: Verify Unity Project Structure
-        run: |
-          # Check if essential Unity project files exist
-          if [ ! -f "ShepSim/ProjectSettings/ProjectVersion.txt" ]; then
-            echo "Error: ProjectVersion.txt not found in ShepSim directory. Invalid Unity project structure."
-            exit 1
-          fi
-          
-          if [ ! -d "ShepSim/Assets" ]; then
-            echo "Error: Assets folder not found in ShepSim directory. Invalid Unity project structure."
-            exit 1
-          fi
-          
-          if [ ! -d "ShepSim/Packages" ]; then
-            echo "Error: Packages folder not found in ShepSim directory. Invalid Unity project structure."
-            exit 1
-          fi
-          
-          echo "Unity project structure verification passed."
-          cat ShepSim/ProjectSettings/ProjectVersion.txt
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: ShepSim/Library
+          key: Library-${{ github.sha }}
+          restore-keys: |
+            Library-
+
+      - name: Run Unity Tests
+        uses: game-ci/unity-test-runner@v3
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ShepSim
+          unityVersion: 2022.3.18f1
+          testMode: EditMode
+          customParameters: -buildTarget StandaloneLinux64
 
   ros-tests:
     runs-on: ubuntu-latest
