@@ -83,7 +83,7 @@ public class RosInterface : MonoBehaviour
     {
         List<GameObject> sheepList = new List<GameObject>(GameObject.FindGameObjectsWithTag("Sheep"));
 
-        PoseArray sheepPoseArray = new PoseArray
+        Path sheepPath = new Path
         {
             header = new RosSharp.RosBridgeClient.MessageTypes.Std.Header
             {
@@ -101,11 +101,7 @@ public class RosInterface : MonoBehaviour
                 header = new RosSharp.RosBridgeClient.MessageTypes.Std.Header
                 {
                     frame_id = "map",
-                    stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time
-                    {
-                        secs = (int)UnityEngine.Time.time,
-                        nsecs = (uint)(int)((UnityEngine.Time.time % 1) * 1e9)
-                    }
+                    stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time()
                 },
                 pose = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose
                 {
