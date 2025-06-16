@@ -16,23 +16,23 @@ jobs:
       - name: Verify Unity Project Structure
         run: |
           # Check if essential Unity project files exist
-          if [ ! -f "ProjectSettings/ProjectVersion.txt" ]; then
-            echo "Error: ProjectVersion.txt not found. Invalid Unity project structure."
+          if [ ! -f "ShepSim/ProjectSettings/ProjectVersion.txt" ]; then
+            echo "Error: ProjectVersion.txt not found in ShepSim directory. Invalid Unity project structure."
             exit 1
           fi
           
-          if [ ! -d "Assets" ]; then
-            echo "Error: Assets folder not found. Invalid Unity project structure."
+          if [ ! -d "ShepSim/Assets" ]; then
+            echo "Error: Assets folder not found in ShepSim directory. Invalid Unity project structure."
             exit 1
           fi
           
-          if [ ! -d "Packages" ]; then
-            echo "Error: Packages folder not found. Invalid Unity project structure."
+          if [ ! -d "ShepSim/Packages" ]; then
+            echo "Error: Packages folder not found in ShepSim directory. Invalid Unity project structure."
             exit 1
           fi
           
           echo "Unity project structure verification passed."
-          cat ProjectSettings/ProjectVersion.txt
+          cat ShepSim/ProjectSettings/ProjectVersion.txt
 
   ros-tests:
     runs-on: ubuntu-latest
