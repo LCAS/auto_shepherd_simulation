@@ -1,4 +1,4 @@
-FROM unityci/editor:ubuntu-6000.1.7f1-mac-mono-3.1.0
+FROM unityci/editor:2022.3.18f1-ubuntu-0.19.0
 
 # Set the working directory
 WORKDIR /app
@@ -6,5 +6,8 @@ WORKDIR /app
 # Copy the Unity project into the container
 COPY . /app/
 
-# Run the Unity tests
-CMD ["/opt/Unity/Editor/Unity", "-batchmode", "-nographics", "-executeMethod", "UnityEditor.TestTools.TestRunner.Api.TestRunnerApi.ExecuteTests"] 
+# Debug: List Unity Editor location
+RUN ls -la /opt/Unity/Editor/
+
+# Run the Unity tests with proper path
+CMD ["/opt/Unity/Editor/Unity", "-batchmode", "-nographics", "-executeMethod", "UnityEditor.TestTools.TestRunner.Api.TestRunnerApi.ExecuteTests", "-projectPath", "/app"] 
