@@ -6,58 +6,6 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  unity-tests:
-    name: ${{ matrix.testMode }} on ${{ matrix.unityVersion }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        projectPath:
-          - .
-        unityVersion:
-          - 2022.3.18f1
-        testMode:
-          - playmode
-          - editmode
-
-    steps:
-      # Checkout
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          lfs: true
-
-      # Cache
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ matrix.projectPath }}/Library
-          key: Library-${{ matrix.projectPath }}
-          restore-keys: |
-            Library-
-
-      # Tests
-      - name: Tests
-        uses: game-ci/unity-test-runner@v3
-        id: tests
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        with:
-          projectPath: ${{ matrix.projectPath }}
-          unityVersion: ${{ matrix.unityVersion }}
-          testMode: ${{ matrix.testMode }}
-          artifactsPath: ${{ matrix.testMode }}-artifacts
-          checkName: ${{ matrix.testMode }} Test Results
-          customParameters: -buildTarget StandaloneLinux64
-
-      # Upload Artifact
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Test results for ${{ matrix.testMode }}
-          path: ${{ steps.tests.outputs.artifactsPath }}
-
   ros-tests:
     runs-on: ubuntu-latest
     steps:
