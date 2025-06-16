@@ -14,21 +14,21 @@ public class RosInterface : MonoBehaviour
     private string dogCommandTopic = "/dog/command";
 
     // Unity to ROS coordinate system conversion
-    private Vector3 UnityToRosPosition(Vector3 unityPosition)
+    private UnityEngine.Vector3 UnityToRosPosition(UnityEngine.Vector3 unityPosition)
     {
         // Convert Unity's right-handed to ROS's left-handed coordinate system
-        return new Vector3(unityPosition.x, -unityPosition.z, unityPosition.y);
+        return new UnityEngine.Vector3(unityPosition.x, -unityPosition.z, unityPosition.y);
     }
 
-    private Quaternion UnityToRosRotation(Quaternion unityRotation)
+    private UnityEngine.Quaternion UnityToRosRotation(UnityEngine.Quaternion unityRotation)
     {
         // Convert Unity's right-handed to ROS's left-handed coordinate system
-        return new Quaternion(-unityRotation.x, unityRotation.z, -unityRotation.y, unityRotation.w);
+        return new UnityEngine.Quaternion(-unityRotation.x, unityRotation.z, -unityRotation.y, unityRotation.w);
     }
 
     private void Start()
     {
-        rosSocket = new RosSocket(rosBridgeServerUrl);
+        rosSocket = new RosSocket(new RosSharp.RosBridgeClient.Protocols.WebSocketNetProtocol(rosBridgeServerUrl));
         rosSocket.Subscribe<Float64MultiArray>(dogCommandTopic, DogCommandCallback);
     }
 
@@ -44,24 +44,36 @@ public class RosInterface : MonoBehaviour
             PublishPoseStamped(dogPoseTopic, dog.transform);
         }
 
-        // Publish sheep poses
+        // Publish sheep poses (using PoseArray for multiple sheep)
         PublishSheepPoses();
     }
 
-    private void PublishPoseStamped(string topic, Transform transform)
+    private void PublishPoseStamped(string topic, UnityEngine.Transform transform)
     {
+        float currentTime = UnityEngine.Time.time;
+        int secs = (int)currentTime;
+
+        float fractionalTime = currentTime - secs;
+        // 2. Multiply by 1 billion to get nanoseconds (as a float)
+        float nanosecondsFloat = fractionalTime * 1e9f;
+        // 3. Round to the nearest whole number (as an int)
+        int nanosecondsInt = Mathf.RoundToInt(nanosecondsFloat);
+        // 4. Explicitly cast to uint
+        uint nsecs = (uint)nanosecondsInt;
+        // ---------------------------------------------------------------
+
         PoseStamped poseStamped = new PoseStamped
         {
             header = new Header
             {
                 frame_id = "map",
-                stamp = new Time
+                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time
                 {
-                    secs = (int)Time.time,
-                    nsecs = (uint)((Time.time % 1) * 1e9)
+                    secs = secs,
+                    nsecs = nsecs
                 }
             },
-            pose = new Pose
+            pose = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose
             {
                 position = new Point
                 {
@@ -69,7 +81,7 @@ public class RosInterface : MonoBehaviour
                     y = UnityToRosPosition(transform.position).y,
                     z = UnityToRosPosition(transform.position).z
                 },
-                orientation = new Quaternion
+                orientation = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Quaternion
                 {
                     x = UnityToRosRotation(transform.rotation).x,
                     y = UnityToRosRotation(transform.rotation).y,
@@ -85,54 +97,64 @@ public class RosInterface : MonoBehaviour
     private void PublishSheepPoses()
     {
         List<GameObject> sheepList = new List<GameObject>(GameObject.FindGameObjectsWithTag("Sheep"));
-        List<PoseStamped> sheepPoses = new List<PoseStamped>();
 
-        foreach (GameObject sheep in sheepList)
+        // Calculate current time for ROS Header
+        float currentTime = UnityEngine.Time.time;
+        int secs = (int)currentTime;
+
+        // --- Foolproof calculation for nsecs (most explicit version) ---
+        float fractionalTime = currentTime - secs;
+        float nanosecondsFloat = fractionalTime * 1e9f;
+        int nanosecondsInt = Mathf.RoundToInt(nanosecondsFloat);
+        uint nsecs = (uint)nanosecondsInt;
+        // ---------------------------------------------------------------
+
+        PoseArray sheepPoseArray = new PoseArray
         {
-            PoseStamped poseStamped = new PoseStamped
+            header = new Header
             {
-                header = new Header
+                frame_id = "map",
+                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time
                 {
-                    frame_id = "map",
-                    stamp = new Time
-                    {
-                        secs = (int)Time.time,
-                        nsecs = (uint)((Time.time % 1) * 1e9)
-                    }
+                    secs = secs,
+                    nsecs = nsecs
+                }
+            },
+            poses = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose[sheepList.Count]
+        };
+
+        for (int i = 0; i < sheepList.Count; i++)
+        {
+            GameObject sheep = sheepList[i];
+            sheepPoseArray.poses[i] = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose
+            {
+                position = new Point
+                {
+                    x = UnityToRosPosition(sheep.transform.position).x,
+                    y = UnityToRosPosition(sheep.transform.position).y,
+                    z = UnityToRosPosition(sheep.transform.position).z
                 },
-                pose = new Pose
+                orientation = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Quaternion
                 {
-                    position = new Point
-                    {
-                        x = UnityToRosPosition(sheep.transform.position).x,
-                        y = UnityToRosPosition(sheep.transform.position).y,
-                        z = UnityToRosPosition(sheep.transform.position).z
-                    },
-                    orientation = new Quaternion
-                    {
-                        x = UnityToRosRotation(sheep.transform.rotation).x,
-                        y = UnityToRosRotation(sheep.transform.rotation).y,
-                        z = UnityToRosRotation(sheep.transform.rotation).z,
-                        w = UnityToRosRotation(sheep.transform.rotation).w
-                    }
+                    x = UnityToRosRotation(sheep.transform.rotation).x,
+                    y = UnityToRosRotation(sheep.transform.rotation).y,
+                    z = UnityToRosRotation(sheep.transform.rotation).z,
+                    w = UnityToRosRotation(sheep.transform.rotation).w
                 }
             };
-
-            sheepPoses.Add(poseStamped);
         }
 
-        rosSocket.Publish(sheepPosesTopic, sheepPoses);
+        rosSocket.Publish(sheepPosesTopic, sheepPoseArray);
     }
 
     private void DogCommandCallback(Float64MultiArray command)
     {
-        // Handle incoming dog command
         if (command.data.Length >= 2)
         {
             float targetX = (float)command.data[0];
             float targetY = (float)command.data[1];
             Debug.Log($"Received dog command: Move to ({targetX}, {targetY})");
-            
+
             // TODO: Implement dog movement logic
         }
     }
@@ -144,4 +166,4 @@ public class RosInterface : MonoBehaviour
             rosSocket.Close();
         }
     }
-} 
+}
