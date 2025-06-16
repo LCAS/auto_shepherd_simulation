@@ -1,0 +1,24 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  ros-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Build ROS Test Container
+        run: |
+          cd ros_interface
+          docker build -t ros_test -f Dockerfile.test .
+          
+      - name: Run ROS Tests
+        run: docker run ros_test 
