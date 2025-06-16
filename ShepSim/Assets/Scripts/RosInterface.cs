@@ -13,6 +13,19 @@ public class RosInterface : MonoBehaviour
     private string sheepPosesTopic = "/sheep/poses";
     private string dogCommandTopic = "/dog/command";
 
+    // Unity to ROS coordinate system conversion
+    private Vector3 UnityToRosPosition(Vector3 unityPosition)
+    {
+        // Convert Unity's right-handed to ROS's left-handed coordinate system
+        return new Vector3(unityPosition.x, -unityPosition.z, unityPosition.y);
+    }
+
+    private Quaternion UnityToRosRotation(Quaternion unityRotation)
+    {
+        // Convert Unity's right-handed to ROS's left-handed coordinate system
+        return new Quaternion(-unityRotation.x, unityRotation.z, -unityRotation.y, unityRotation.w);
+    }
+
     private void Start()
     {
         rosSocket = new RosSocket(rosBridgeServerUrl);
@@ -21,37 +34,107 @@ public class RosInterface : MonoBehaviour
 
     private void Update()
     {
-        // Publish drone pose (example: using transform.position)
-        Vector3 dronePosition = transform.position;
-        Point dronePose = new Point(dronePosition.x, dronePosition.y, dronePosition.z);
-        rosSocket.Publish(dronePoseTopic, dronePose);
+        // Publish drone pose
+        PublishPoseStamped(dronePoseTopic, transform);
 
-        // Publish dog pose (example: using a separate GameObject for the dog)
+        // Publish dog pose
         GameObject dog = GameObject.Find("Dog");
         if (dog != null)
         {
-            Vector3 dogPosition = dog.transform.position;
-            Quaternion dogRotation = dog.transform.rotation;
-            Point dogPose = new Point(dogPosition.x, dogPosition.y, 0);
-            Quaternion dogOrientation = new Quaternion(dogRotation.x, dogRotation.y, dogRotation.z, dogRotation.w);
-            rosSocket.Publish(dogPoseTopic, dogPose);
+            PublishPoseStamped(dogPoseTopic, dog.transform);
         }
 
-        // Publish sheep poses (example: using a list of sheep GameObjects)
+        // Publish sheep poses
+        PublishSheepPoses();
+    }
+
+    private void PublishPoseStamped(string topic, Transform transform)
+    {
+        PoseStamped poseStamped = new PoseStamped
+        {
+            header = new Header
+            {
+                frame_id = "map",
+                stamp = new Time
+                {
+                    secs = (int)Time.time,
+                    nsecs = (uint)((Time.time % 1) * 1e9)
+                }
+            },
+            pose = new Pose
+            {
+                position = new Point
+                {
+                    x = UnityToRosPosition(transform.position).x,
+                    y = UnityToRosPosition(transform.position).y,
+                    z = UnityToRosPosition(transform.position).z
+                },
+                orientation = new Quaternion
+                {
+                    x = UnityToRosRotation(transform.rotation).x,
+                    y = UnityToRosRotation(transform.rotation).y,
+                    z = UnityToRosRotation(transform.rotation).z,
+                    w = UnityToRosRotation(transform.rotation).w
+                }
+            }
+        };
+
+        rosSocket.Publish(topic, poseStamped);
+    }
+
+    private void PublishSheepPoses()
+    {
         List<GameObject> sheepList = new List<GameObject>(GameObject.FindGameObjectsWithTag("Sheep"));
-        List<Point> sheepPoses = new List<Point>();
+        List<PoseStamped> sheepPoses = new List<PoseStamped>();
+
         foreach (GameObject sheep in sheepList)
         {
-            Vector3 sheepPosition = sheep.transform.position;
-            sheepPoses.Add(new Point(sheepPosition.x, sheepPosition.y, 0));
+            PoseStamped poseStamped = new PoseStamped
+            {
+                header = new Header
+                {
+                    frame_id = "map",
+                    stamp = new Time
+                    {
+                        secs = (int)Time.time,
+                        nsecs = (uint)((Time.time % 1) * 1e9)
+                    }
+                },
+                pose = new Pose
+                {
+                    position = new Point
+                    {
+                        x = UnityToRosPosition(sheep.transform.position).x,
+                        y = UnityToRosPosition(sheep.transform.position).y,
+                        z = UnityToRosPosition(sheep.transform.position).z
+                    },
+                    orientation = new Quaternion
+                    {
+                        x = UnityToRosRotation(sheep.transform.rotation).x,
+                        y = UnityToRosRotation(sheep.transform.rotation).y,
+                        z = UnityToRosRotation(sheep.transform.rotation).z,
+                        w = UnityToRosRotation(sheep.transform.rotation).w
+                    }
+                }
+            };
+
+            sheepPoses.Add(poseStamped);
         }
+
         rosSocket.Publish(sheepPosesTopic, sheepPoses);
     }
 
     private void DogCommandCallback(Float64MultiArray command)
     {
         // Handle incoming dog command
-        Debug.Log("Received dog command: " + command);
+        if (command.data.Length >= 2)
+        {
+            float targetX = (float)command.data[0];
+            float targetY = (float)command.data[1];
+            Debug.Log($"Received dog command: Move to ({targetX}, {targetY})");
+            
+            // TODO: Implement dog movement logic
+        }
     }
 
     private void OnDestroy()
