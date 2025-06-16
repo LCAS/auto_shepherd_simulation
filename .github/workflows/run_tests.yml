@@ -17,8 +17,7 @@ jobs:
       
       - name: Build ROS Test Container
         run: |
-          cd ros_interface
-          docker build -t ros_test -f Dockerfile.test .
+          docker build -t ros_test -f ros_interface/Dockerfile.test .
           
       - name: Run ROS Tests
         run: docker run ros_test 
