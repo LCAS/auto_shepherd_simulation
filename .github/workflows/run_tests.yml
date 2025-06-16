@@ -49,6 +49,7 @@ jobs:
           artifactsPath: ${{ matrix.testMode }}-artifacts
           checkName: ${{ matrix.testMode }} Test Results
           customParameters: -buildTarget StandaloneLinux64
+          imageTag: ubuntu-2022.3.18f1-base-0.19.0
 
       # Upload Artifact
       - name: Upload Artifact
