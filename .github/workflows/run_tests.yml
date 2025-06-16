@@ -48,6 +48,7 @@ jobs:
           testMode: ${{ matrix.testMode }}
           artifactsPath: ${{ matrix.testMode }}-artifacts
           checkName: ${{ matrix.testMode }} Test Results
+          customParameters: -buildTarget StandaloneLinux64
 
       # Upload Artifact
       - name: Upload Artifact
