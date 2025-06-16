@@ -6,7 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  test:
+  unity-tests:
     name: ${{ matrix.testMode }} on ${{ matrix.unityVersion }}
     runs-on: ubuntu-latest
     strategy:
@@ -70,19 +70,4 @@ jobs:
           docker build -t ros_test -f Dockerfile.test .
           
       - name: Run ROS Tests
-        run: docker run ros_test
-
-  unity-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      
-      - name: Build Unity Test Container
-        run: |
-          cd ShepSim/Assets/Scripts/tests
-          docker build -t unity_test -f Dockerfile.test .
-          
-      - name: Run Unity Tests
-        run: docker run unity_test 
+        run: docker run ros_test 
