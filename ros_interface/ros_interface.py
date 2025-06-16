@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose, Point, Quaternion, PoseArray, PoseStamped
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
+from nav_msgs.msg import Path
 from std_msgs.msg import Float64MultiArray, Header
 import numpy as np
 from builtin_interfaces.msg import Duration
@@ -10,7 +11,7 @@ class RosInterface(Node):
         super().__init__('ros_interface')
         self.drone_publisher = self.create_publisher(PoseStamped, '/drone/pose', 10)
         self.dog_publisher = self.create_publisher(PoseStamped, '/dog/pose', 10)
-        self.sheep_publisher = self.create_publisher(PoseArray, '/sheep/poses', 10)
+        self.sheep_publisher = self.create_publisher(Path, '/sheep/poses', 10)
         self.dog_command_subscription = self.create_subscription(Float64MultiArray, '/dog/command', self.dog_command_callback, 10)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -36,16 +37,16 @@ class RosInterface(Node):
         dog_pose = self.create_pose_stamped(4.0, 5.0, 0.0)
         self.dog_publisher.publish(dog_pose)
 
-        # Publish sheep poses as a PoseArray with PoseStamped messages
-        sheep_poses = PoseArray()
-        sheep_poses.header = self.create_header()
+        # Publish sheep poses as a Path
+        sheep_path = Path()
+        sheep_path.header = self.create_header()
         
         # Example sheep poses with individual timestamps
-        sheep_poses.poses = [
-            self.create_pose_stamped(6.0, 7.0, 0.0).pose,
-            self.create_pose_stamped(8.0, 9.0, 0.0).pose
+        sheep_path.poses = [
+            self.create_pose_stamped(6.0, 7.0, 0.0),
+            self.create_pose_stamped(8.0, 9.0, 0.0)
         ]
-        self.sheep_publisher.publish(sheep_poses)
+        self.sheep_publisher.publish(sheep_path)
 
     def dog_command_callback(self, msg):
         # Handle incoming dog command

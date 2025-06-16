@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 from ros_interface import RosInterface
 import rclpy
-from geometry_msgs.msg import PoseArray, PoseStamped
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
 
 class TestRosInterface(unittest.TestCase):
     def setUp(self):
@@ -26,10 +27,10 @@ class TestRosInterface(unittest.TestCase):
         self.assertEqual(self.ros_interface.dog_publisher.publish.call_count, 1)
         self.assertEqual(self.ros_interface.sheep_publisher.publish.call_count, 1)
 
-        # Verify the sheep poses were published as a PoseArray
-        sheep_poses = self.ros_interface.sheep_publisher.publish.call_args[0][0]
-        self.assertIsInstance(sheep_poses, PoseArray)
-        self.assertEqual(len(sheep_poses.poses), 2)
+        # Verify the sheep poses were published as a Path
+        sheep_path = self.ros_interface.sheep_publisher.publish.call_args[0][0]
+        self.assertIsInstance(sheep_path, Path)
+        self.assertEqual(len(sheep_path.poses), 2)
 
 if __name__ == '__main__':
     unittest.main()
