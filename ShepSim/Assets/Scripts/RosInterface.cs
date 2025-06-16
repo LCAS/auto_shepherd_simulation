@@ -50,28 +50,12 @@ public class RosInterface : MonoBehaviour
 
     private void PublishPoseStamped(string topic, UnityEngine.Transform transform)
     {
-        float currentTime = UnityEngine.Time.time;
-        int secs = (int)currentTime;
-
-        float fractionalTime = currentTime - secs;
-        // 2. Multiply by 1 billion to get nanoseconds (as a float)
-        float nanosecondsFloat = fractionalTime * 1e9f;
-        // 3. Round to the nearest whole number (as an int)
-        int nanosecondsInt = Mathf.RoundToInt(nanosecondsFloat);
-        // 4. Explicitly cast to uint
-        uint nsecs = (uint)nanosecondsInt;
-        // ---------------------------------------------------------------
-
         PoseStamped poseStamped = new PoseStamped
         {
             header = new Header
             {
                 frame_id = "map",
-                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time
-                {
-                    secs = secs,
-                    nsecs = nsecs
-                }
+                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time()
             },
             pose = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose
             {
@@ -98,27 +82,12 @@ public class RosInterface : MonoBehaviour
     {
         List<GameObject> sheepList = new List<GameObject>(GameObject.FindGameObjectsWithTag("Sheep"));
 
-        // Calculate current time for ROS Header
-        float currentTime = UnityEngine.Time.time;
-        int secs = (int)currentTime;
-
-        // --- Foolproof calculation for nsecs (most explicit version) ---
-        float fractionalTime = currentTime - secs;
-        float nanosecondsFloat = fractionalTime * 1e9f;
-        int nanosecondsInt = Mathf.RoundToInt(nanosecondsFloat);
-        uint nsecs = (uint)nanosecondsInt;
-        // ---------------------------------------------------------------
-
         PoseArray sheepPoseArray = new PoseArray
         {
             header = new Header
             {
                 frame_id = "map",
-                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time
-                {
-                    secs = secs,
-                    nsecs = nsecs
-                }
+                stamp = new RosSharp.RosBridgeClient.MessageTypes.Std.Time()
             },
             poses = new RosSharp.RosBridgeClient.MessageTypes.Geometry.Pose[sheepList.Count]
         };
