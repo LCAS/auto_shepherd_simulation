@@ -20,29 +20,30 @@ class RosInterface(Node):
         header.frame_id = 'map'
         return header
 
+    def create_pose_stamped(self, x, y, z, qw=1.0, qx=0.0, qy=0.0, qz=0.0):
+        pose_stamped = PoseStamped()
+        pose_stamped.header = self.create_header()
+        pose_stamped.pose.position = Point(x=x, y=y, z=z)
+        pose_stamped.pose.orientation = Quaternion(x=qx, y=qy, z=qz, w=qw)
+        return pose_stamped
+
     def timer_callback(self):
         # Publish drone pose
-        drone_pose = PoseStamped()
-        drone_pose.header = self.create_header()
-        drone_pose.pose.position = Point(x=1.0, y=2.0, z=3.0)
-        drone_pose.pose.orientation = Quaternion(w=1.0)
+        drone_pose = self.create_pose_stamped(1.0, 2.0, 3.0)
         self.drone_publisher.publish(drone_pose)
 
         # Publish dog pose
-        dog_pose = PoseStamped()
-        dog_pose.header = self.create_header()
-        dog_pose.pose.position = Point(x=4.0, y=5.0, z=0.0)
-        dog_pose.pose.orientation = Quaternion(w=1.0)
+        dog_pose = self.create_pose_stamped(4.0, 5.0, 0.0)
         self.dog_publisher.publish(dog_pose)
 
-        # Publish sheep poses as a PoseArray
+        # Publish sheep poses as a PoseArray with PoseStamped messages
         sheep_poses = PoseArray()
         sheep_poses.header = self.create_header()
         
-        # Example sheep poses
+        # Example sheep poses with individual timestamps
         sheep_poses.poses = [
-            Pose(position=Point(x=6.0, y=7.0, z=0.0), orientation=Quaternion(w=1.0)),
-            Pose(position=Point(x=8.0, y=9.0, z=0.0), orientation=Quaternion(w=1.0))
+            self.create_pose_stamped(6.0, 7.0, 0.0).pose,
+            self.create_pose_stamped(8.0, 9.0, 0.0).pose
         ]
         self.sheep_publisher.publish(sheep_poses)
 
