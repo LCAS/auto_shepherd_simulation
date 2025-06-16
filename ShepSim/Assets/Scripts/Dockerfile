@@ -1,0 +1,10 @@
+FROM unityci/editor:2022.3.18f1-ubuntu-0.19.0
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the Unity project into the container
+COPY . /app/
+
+# Run the Unity tests
+CMD ["/opt/Unity/Editor/Unity", "-batchmode", "-nographics", "-executeMethod", "UnityEditor.TestTools.TestRunner.Api.TestRunnerApi.ExecuteTests"]

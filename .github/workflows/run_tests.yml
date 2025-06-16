@@ -1,0 +1,34 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ros-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build ROS Test Container
+        run: |
+          cd ros_interface
+          docker build -t ros_test -f Dockerfile.test .
+          
+      - name: Run ROS Tests
+        run: docker run ros_test
+
+  unity-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Unity Test Container
+        run: |
+          cd ShepSim/Assets/Scripts/tests
+          docker build -t unity_test -f Dockerfile.test .
+          
+      - name: Run Unity Tests
+        run: docker run unity_test 

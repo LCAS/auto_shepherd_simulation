@@ -1,0 +1,19 @@
+FROM ros:rolling
+
+# Install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the ROS interface script and test script into the container
+COPY ros_interface.py /app/
+COPY tests/test_ros_interface.py /app/tests/
+
+# Set the PYTHONPATH to include the current directory
+ENV PYTHONPATH=/app
+
+# Run the ROS tests
+CMD ["python3", "tests/test_ros_interface.py"] 
