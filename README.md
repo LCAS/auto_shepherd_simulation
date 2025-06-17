@@ -29,3 +29,14 @@ Through these activities, the group will gain experience in natural system simul
 
 ## Future Engagement:
 The resulting simulation will be used as a framework for many experiments going forward. Group members will have opportunities to engage with such works and subsequent publications. 
+___
+Run docker container
+
+Build it
+```
+docker build .
+```
+Run it
+```
+docker run -it --rm     --name ros2_build_debugger     --net=host     auto_shepherd_ros2_app:humble /bin/bash
+```
