@@ -11,13 +11,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy the ROS interface script and test script into the container
-COPY src/ros_interface.py /app/
-COPY tests/test_ros_interface.py /app/tests/
+COPY src/ros_interface.py /app/ros_interface.py
+COPY tests/test_ros_interface.py /app/tests/test_ros_interface.py
 
-# Set the PYTHONPATH to include the current directory
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app
 
-# Source ROS Humble setup
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 
 # Run the ROS tests
