@@ -5,7 +5,7 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Float64MultiArray
 import numpy as np
 import math
-from tmpDogSim.dog_control_lib import find_best_dog_position
+from tmpDogSim.dog_control_lib import find_best_dog_position, plot_current_state
 
 class DogController(Node):
     def __init__(self):
@@ -43,19 +43,28 @@ class DogController(Node):
 
     # ------------ closed-loop control -----------------------------------
     def _control_step(self):
+        print("_control_step")
+
         if self.dog_xy is None or self.sheep_xy is None or self.goal_xy is None:
+            print(self.dog_xy)
+            print(self.sheep_xy)
+            print(self.goal_xy)
             return  # wait for all data
 
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xd, yd = self.dog_xy
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd, yd, xc, yc)
+        xd_opt, yd_opt, points = find_best_dog_position(xs, ys, xd, yd, xc, yc)
 
         cmd = Float64MultiArray()
         cmd.data = [float(xd_opt), float(yd_opt)]
         self.cmd_pub.publish(cmd)
         self.get_logger().debug(f'Cmd ({xd_opt:.2f}, {yd_opt:.2f})')
+
+        # plot
+        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
+        
 
 # ----------------------------------------------------------------------
 # entry-point -----------------------------------------------------------

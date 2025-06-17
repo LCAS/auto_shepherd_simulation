@@ -50,8 +50,8 @@ class RosInterface(Node):
         self.sheep_publisher.publish(sheep_path)
 
         # Publish sheep goal pose
-        dog_pose = self.create_pose_stamped(1.0, 1.0, 0.0)
-        self.dog_publisher.publish(dog_pose)
+        sheep_goal_pose = self.create_pose_stamped(1.0, 1.0, 0.0)
+        self.sheep_goal_publisher.publish(sheep_goal_pose)
 
     def dog_command_callback(self, msg):
         # Handle incoming dog command

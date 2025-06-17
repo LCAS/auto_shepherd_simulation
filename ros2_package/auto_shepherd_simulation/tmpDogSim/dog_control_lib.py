@@ -3,7 +3,6 @@ import math as maths
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.datasets import make_blobs
 
 def smallest_enclosing_circle(points):
     center = np.mean(points, axis=0)
@@ -68,4 +67,41 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
             if i-last_update > 10: break
-    return optimal_xd, optimal_yd
+    return optimal_xd, optimal_yd, points
+
+def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, points, radius_d=1.5):
+    (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(6)
+    fig.set_figwidth(6)
+    plt.scatter(x, y)
+    plt.scatter([xmean], [ymean], s=1000, alpha=0.5)
+    xvel, yvel = get_direction(x, y, xd, yd)
+    xvel, yvel = normalise_velocities(xvel, yvel)
+    plt.arrow(xmean, ymean, xvel, yvel)
+
+    xveldesired, yveldesired = xc - xmean, yc - ymean
+    xveldesired, yveldesired = normalise_velocities(xveldesired, yveldesired)
+    plt.arrow(xmean, ymean, xveldesired, yveldesired)
+
+    print(angle(xvel, yvel, xveldesired, yveldesired))
+
+    plt.scatter([xd],[yd])
+    plt.scatter([xc],[yc], s=10000, alpha=0.2)
+
+    circle_a = plt.Circle((xd, yd), radius_d, color='r', fill=False, label='Circle A')
+    circle_b = plt.Circle((xmean, ymean), radius_sheep, color='b', fill=False, label='Circle B')
+    ax.add_patch(circle_a)
+    ax.add_patch(circle_b)
+    plt.scatter(points[:,0], points[:,1])
+    plt.scatter([optimal_xd], [optimal_yd], s=100, alpha=0.5, c="r")
+
+
+    plt.xlim(0,10)
+    plt.ylim(0,10)
+    plt.savefig("tmp.png")
+    plt.close()
+    im=cv2.imread("tmp.png")
+    cv2.imshow("win", im)
+    cv2.waitKey(1)
