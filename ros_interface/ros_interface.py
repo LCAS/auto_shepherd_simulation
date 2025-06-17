@@ -12,6 +12,7 @@ class RosInterface(Node):
         self.drone_publisher = self.create_publisher(PoseStamped, '/drone/pose', 10)
         self.dog_publisher = self.create_publisher(PoseStamped, '/dog/pose', 10)
         self.sheep_publisher = self.create_publisher(Path, '/sheep/poses', 10)
+        self.sheep_goal_publisher = self.create_publisher(PoseStamped, '/sheep/goal_pose', 10)
         self.dog_command_subscription = self.create_subscription(Float64MultiArray, '/dog/command', self.dog_command_callback, 10)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -47,6 +48,10 @@ class RosInterface(Node):
             self.create_pose_stamped(8.0, 9.0, 0.0)
         ]
         self.sheep_publisher.publish(sheep_path)
+
+        # Publish sheep goal pose
+        dog_pose = self.create_pose_stamped(1.0, 1.0, 0.0)
+        self.dog_publisher.publish(dog_pose)
 
     def dog_command_callback(self, msg):
         # Handle incoming dog command
