@@ -17,7 +17,6 @@ public class RosInterface : MonoBehaviour
     // Unity to ROS coordinate system conversion
     private UnityEngine.Vector3 UnityToRosPosition(UnityEngine.Vector3 unityPosition)
     {
-        // Convert Unity's right-handed to ROS's left-handed coordinate system
         return new UnityEngine.Vector3(unityPosition.x, -unityPosition.z, unityPosition.y);
     }
 
@@ -35,17 +34,12 @@ public class RosInterface : MonoBehaviour
 
     private void Update()
     {
-        // Publish drone pose
         PublishPoseStamped(dronePoseTopic, transform);
-
-        // Publish dog pose
         UnityEngine.GameObject dog = UnityEngine.GameObject.Find("Dog");
         if (dog != null)
         {
             PublishPoseStamped(dogPoseTopic, dog.transform);
         }
-
-        // Publish sheep poses
         PublishSheepPoses();
     }
 
