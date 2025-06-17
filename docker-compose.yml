@@ -17,7 +17,7 @@ services:
 
     # — Bind‑mount each git sub‑module into the workspace ————————————
     volumes:
-      - ./ros_interface:/home/ros/base_ws/src:rw
+      - ./ros_interface/src:/home/ros/base_ws/src:rw
       # - ../submodules/sensors_src:/home/ros/sensors_ws/src:rw
       # - ../submodules/autonomy_src:/home/ros/autonomy_ws/src:rw
       # - ../submodules/control_src:/home/ros/control_ws/src:rw
