@@ -131,8 +131,8 @@ WORKDIR /home/${USERNAME}
 RUN sed -i 's/^#\(force_color_prompt\)/\1/' /home/${USERNAME}/.bashrc
 
 # ── Friendly hook: source your extension if it exists ───────────────
-RUN echo '[ -f $HOME/bash_scripts/bashrc_extension.sh ] && \
-    source $HOME/bash_scripts/bashrc_extension.sh' \
+RUN echo '[ -f $HOME/bash_scripts/bashrc_extensions.sh ] && \
+    source $HOME/bash_scripts/bashrc_extensions.sh' \
     >> /home/${USERNAME}/.bashrc
 
 # ──────────────────────────────
