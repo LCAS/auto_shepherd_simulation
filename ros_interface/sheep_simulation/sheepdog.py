@@ -2,11 +2,16 @@ import pygame
 import math
 
 class SheepDog:
-    def __init__(self, x, y, yaw=0):
+    def __init__(self, position, velocity=None, yaw=0):
         # State
-        self.x = x
-        self.y = y
+        self.x = position[0]
+        self.y = position[1]
         self.yaw = yaw  # Direction in radians
+        
+        # Velocity
+        if velocity is None:
+            velocity = [0, 0]
+        self.velocity = velocity
         
         # Physical properties
         self.size = 20  # Size of the pig
@@ -28,6 +33,13 @@ class SheepDog:
             
         self.x = max(self.size, min(self.width - self.size, x))
         self.y = max(self.size, min(self.height - self.size, y))
+
+    def get_state(self):
+        """Return current state in the standard format"""
+        return {
+            'position': [self.x, self.y],
+            'velocity': self.velocity
+        }
 
     def draw(self, screen):
         # Create a surface for the pig
@@ -115,6 +127,9 @@ class SheepDogController:
         # Calculate movement based on current speed and direction
         dx = math.cos(self.sheepdog.yaw) * self.current_speed
         dy = -math.sin(self.sheepdog.yaw) * self.current_speed
+
+        # Update velocity
+        self.sheepdog.velocity = [dx, dy]
 
         # Update position using the sheepdog's set_position method
         self.sheepdog.set_position(self.sheepdog.x + dx, self.sheepdog.y + dy) 

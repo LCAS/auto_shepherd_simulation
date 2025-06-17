@@ -121,3 +121,12 @@ You can modify various parameters in the code to change the behavior:
 - `max_force`: Maximum steering force
 - `perception_radius`: How far each sheep can see other sheep
 - `size`: Size of the sheep circles 
+
+
+## Pose/Speed format
+``` python
+{
+    'position': [x,y]
+    'velocity': [x,y]
+}
+```

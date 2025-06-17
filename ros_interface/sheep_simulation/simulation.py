@@ -52,44 +52,80 @@ class Slider:
             self.handle_rect.x = self.rect.x + rel_x - 5
 
 class Simulation:
-    def __init__(self, width, height, sheep_positions=None, sheepdog_position=None):
+    def __init__(self, width, height, sheep_states=None, sheepdog_state=None):
         self.width = width
         self.height = height
         
         # Create the sheepdog
-        if sheepdog_position is None:
-            sheepdog_position = (width/2, height/2, 0)  # (x, y, yaw)
-        self.sheepdog = SheepDog(sheepdog_position[0], sheepdog_position[1], sheepdog_position[2])
+        if sheepdog_state is None:
+            sheepdog_state = {
+                'position': [width/2, height/2],
+                'velocity': [0, 0]
+            }
+        self.sheepdog = SheepDog(
+            position=sheepdog_state['position'],
+            velocity=sheepdog_state['velocity'],
+            yaw=0  # Initial yaw
+        )
         
         # Create a list of sheep
-        self.num_sheep = 50 if sheep_positions is None else len(sheep_positions)
+        self.num_sheep = 50 if sheep_states is None else len(sheep_states)
         self.sheep_list = []
-        self._initialize_sheep(sheep_positions)
+        self._initialize_sheep(sheep_states)
         
         # Flocking parameters
         self.alignment_weight = 1.0
-        self.cohesion_weight = 0.23
+        self.cohesion_weight = 0.3
         self.separation_weight = 6.0
 
-    def _initialize_sheep(self, sheep_positions=None):
-        """Initialize sheep with given positions or random positions"""
-        if sheep_positions is None:
+    def _initialize_sheep(self, sheep_states=None):
+        """Initialize sheep with given states or random positions"""
+        if sheep_states is None:
             # Initialize with random positions
             for _ in range(self.num_sheep):
                 margin = 50
-                x = random.uniform(margin, self.width - margin)
-                y = random.uniform(margin, self.height - margin)
-                self.sheep_list.append(Sheep(x, y, self.width, self.height))
+                position = [
+                    random.uniform(margin, self.width - margin),
+                    random.uniform(margin, self.height - margin)
+                ]
+                velocity = [0, 0]  # Start with zero velocity
+                self.sheep_list.append(Sheep(
+                    position=position,
+                    velocity=velocity,
+                    width=self.width,
+                    height=self.height
+                ))
         else:
-            # Initialize with given positions
-            for pos in sheep_positions:
-                if len(pos) == 2:  # (x, y)
-                    self.sheep_list.append(Sheep(pos[0], pos[1], self.width, self.height))
-                else:
-                    raise ValueError("Sheep positions must be provided as (x, y) tuples")
+            # Initialize with given states
+            for state in sheep_states:
+                if not isinstance(state, dict) or 'position' not in state:
+                    raise ValueError("Sheep states must be provided as dictionaries with 'position' key")
+                position = state['position']
+                velocity = state.get('velocity', [0, 0])  # Default to zero velocity if not provided
+                self.sheep_list.append(Sheep(
+                    position=position,
+                    velocity=velocity,
+                    width=self.width,
+                    height=self.height
+                ))
 
-    def update(self):
-        """Update the simulation state"""
+    def update(self, sheepdog_state=None):
+        """Update the simulation state
+        
+        Args:
+            sheepdog_state: Optional dictionary with 'position' and 'velocity' keys.
+                          If None, the sheepdog's current state is maintained.
+        """
+        # Update sheepdog state if provided
+        if sheepdog_state is not None:
+            if not isinstance(sheepdog_state, dict) or 'position' not in sheepdog_state:
+                raise ValueError("Sheepdog state must be provided as a dictionary with 'position' key")
+            self.sheepdog.x = sheepdog_state['position'][0]
+            self.sheepdog.y = sheepdog_state['position'][1]
+            if 'velocity' in sheepdog_state:
+                self.sheepdog.velocity = sheepdog_state['velocity']
+            self.sheepdog.set_screen_bounds(self.width, self.height)
+        
         # Update each sheep
         for sheep in self.sheep_list:
             # Update weights
@@ -104,8 +140,8 @@ class Simulation:
     def get_state(self):
         """Return the current state of the simulation"""
         return {
-            'sheep': [(sheep.x, sheep.y) for sheep in self.sheep_list],
-            'sheepdog': (self.sheepdog.x, self.sheepdog.y, self.sheepdog.yaw)
+            'sheep': [sheep.get_state() for sheep in self.sheep_list],
+            'sheepdog': self.sheepdog.get_state()
         }
 
 class Game:
@@ -167,8 +203,11 @@ class Game:
         # Update sheepdog position based on keyboard input
         self.sheepdog_controller.update(keys)
         
-        # Update simulation
-        self.simulation.update()
+        # Get current sheepdog state
+        sheepdog_state = self.simulation.sheepdog.get_state()
+        
+        # Update simulation with current sheepdog state
+        self.simulation.update(sheepdog_state)
         
         # Update simulation parameters from sliders
         self.simulation.alignment_weight = self.sliders['alignment'].value
