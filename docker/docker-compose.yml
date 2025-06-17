@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: robot-ros2-humble # resulting image name
 
-    container_name: dogsheep_ros2_devcontainer
+    # container_name: dogsheep_ros2_devcontainer
     stdin_open: true
     tty: true
     command: /bin/bash # default shell when you attach
@@ -17,14 +17,16 @@ services:
 
     # — Bind‑mount each git sub‑module into the workspace ————————————
     volumes:
-      - ./ros_interface/src:/home/ros/base_ws/src:rw
+      # - ../ros2_package:/home/ros/base_ws/src/:rw
+      - ../ros2_package:/home/ros/base_ws/src/ros2_package:rw
+      # - ./entry_script.sh:/home/ros/bash_scripts:rw
       # - ../submodules/sensors_src:/home/ros/sensors_ws/src:rw
       # - ../submodules/autonomy_src:/home/ros/autonomy_ws/src:rw
       # - ../submodules/control_src:/home/ros/control_ws/src:rw
       # - ../submodules/environment_src:/home/ros/environment_ws/src:rw
 
       # Bash Scripts
-      # - ../bash_scripts/container:/home/ros/bash_scripts:rw
+      - ../bash_scripts/container:/home/ros/bash_scripts:rw
 
       # Rosbag Storage
       # - ../rosbags:/home/ros/rosbags:rw

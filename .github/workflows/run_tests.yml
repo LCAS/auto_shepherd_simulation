@@ -18,10 +18,9 @@ jobs:
       - name: Prepare files for Docker build
         run: |
           mkdir -p docker_build/src
-          cp ros_interface/src/ros_interface.py docker_build/src/ros_interface.py
-          cp -r ros_interface/tests docker_build/tests
-
-          cp ros_interface/Dockerfile.test docker_build/Dockerfile
+          cp ros2_package/auto_shepherd_simulation/ros_interface.py docker_build/src/ros_interface.py
+          cp -r tests docker_build/tests
+          cp tests/Dockerfile.test docker_build/Dockerfile
 
       - name: Build ROS Test Container
         run: |
