@@ -1,0 +1,33 @@
+schemaVersion: "2.0.0"
+
+metadataTest:
+  - env:
+      - key: "PYTHONPATH"
+        value: "/app"
+
+fileExistenceTests:
+  - name: "Check ROS interface script exists"
+    path: "/app/src/ros_interface.py"
+    shouldExist: true
+    permissions: "-rw-r--r--"
+
+  - name: "Check test script exists"
+    path: "/app/tests/test_ros_interface.py"
+    shouldExist: true
+    permissions: "-rw-r--r--"
+
+commandTests:
+  - name: "Check Python version"
+    command: "python3"
+    args: ["--version"]
+    expectedOutput: [".*Python 3.*"]
+
+  - name: "Check ROS installation"
+    command: "ros2"
+    args: ["--version"]
+    expectedOutput: [".*ROS 2.*"]
+
+  - name: "Check rclpy installation"
+    command: "python3"
+    args: ["-c", "import rclpy"]
+    exitCode: 0
