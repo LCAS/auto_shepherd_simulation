@@ -2,10 +2,10 @@ name: Run Tests
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     types: [opened, synchronize, reopened]
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   ros-tests:
@@ -14,18 +14,19 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
+
       - name: Prepare files for Docker build
         run: |
-          mkdir -p docker_build/tests
-          cp ros_interface/ros_interface.py docker_build/
-          cp ros_interface/tests/test_ros_interface.py docker_build/tests/
+          mkdir -p docker_build/src
+          cp ros_interface/src/ros_interface.py docker_build/src/ros_interface.py
+          cp -r ros_interface/tests docker_build/tests
+
           cp ros_interface/Dockerfile.test docker_build/Dockerfile
-      
+
       - name: Build ROS Test Container
         run: |
           cd docker_build
           docker build -t ros_test .
-          
+
       - name: Run ROS Tests
-        run: docker run ros_test 
+        run: docker run ros_test

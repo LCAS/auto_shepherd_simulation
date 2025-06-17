@@ -1,48 +1,141 @@
-# Dockerfile
-# Located in the root of your project: auto_shepherd_simulation/Dockerfile
+# ──────────────────────────────
+# 1. Base – ROS 2 Humble
+# ──────────────────────────────
+FROM osrf/ros:humble-desktop-full
 
-# Use a standard ROS 2 Humble base image
-FROM ros:humble-ros-base-jammy
+# before any 'apt-get update' that touches ros2-testing
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg2 \
+    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F42ED6FBAB17C654
 
-# Set environment variables for ROS 2 sourcing
-ENV ROS_DISTRO humble
-ENV DEBIAN_FRONTEND noninteractive
+RUN echo "deb http://packages.ros.org/ros2-testing/ubuntu $(lsb_release -cs) main" \
+    | tee /etc/apt/sources.list.d/ros2-testing.list
 
-# Update apt and install essential build tools and common ROS 2 Python dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3-pip \
+ARG  DEBIAN_FRONTEND=noninteractive
+ARG  USERNAME=ros
+ARG  UID=1000
+ARG  GID=1000
+
+# ──────────────────────────────
+# 2. Non‑root user with sudo
+# ──────────────────────────────
+
+RUN apt-get update && apt-get install -y sudo git \
+    && addgroup --gid ${GID} ${USERNAME} \
+    && adduser  --uid ${UID} --gid ${GID} --disabled-password --gecos "" ${USERNAME} \
+    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && addgroup dialout || true && usermod -a -G dialout ${USERNAME}
+
+# ──────────────────────────────
+# 3. Empty workspace skeleton for submodules
+#    (sources come in as volumes at run‑time)
+# ──────────────────────────────
+
+# 1. Empty workspace skeleton for base drivers
+ENV BASE_WS=/home/${USERNAME}/base_ws
+RUN mkdir -p ${BASE_WS}/src \
+    && chown -R ${USERNAME}:${USERNAME} ${BASE_WS}
+
+# # 2. Empty workspace skeleton for exteroceptive sensors
+# ENV SENSORS_WS=/home/${USERNAME}/sensors_ws
+# RUN mkdir -p ${SENSORS_WS}/src \
+#  && chown -R ${USERNAME}:${USERNAME} ${SENSORS_WS}
+
+# # 3. Empty workspace skeleton for autonomy-related packages
+# ENV AUTONOMY_WS=/home/${USERNAME}/autonomy_ws
+# RUN mkdir -p ${AUTONOMY_WS}/src \
+#  && chown -R ${USERNAME}:${USERNAME} ${AUTONOMY_WS}
+
+# # 4. Empty workspace skeleton for contorl and task-related packages
+# ENV CONTROL_WS=/home/${USERNAME}/control_ws
+# RUN mkdir -p ${CONTROL_WS}/src \
+#  && chown -R ${USERNAME}:${USERNAME} ${CONTROL_WS}
+
+
+# # 5. Empty workspace skeleton for contorl and task-related packages
+# ENV ENVIRONMENT_WS=/home/${USERNAME}/environment_ws
+# RUN mkdir -p ${ENVIRONMENT_WS}/src \
+#  && chown -R ${USERNAME}:${USERNAME} ${ENVIRONMENT_WS}
+
+# ──────────────────────────────
+# 4. Empty directory for storing bash scripts
+#    (sources come in as volumes at run‑time)
+# ──────────────────────────────
+ENV BASH_SCRIPTS=/home/${USERNAME}/bash_scripts
+RUN mkdir -p ${BASH_SCRIPTS} \
+    && chown -R ${USERNAME}:${USERNAME} ${BASH_SCRIPTS}
+
+# ──────────────────────────────
+# 5. Empty directory for storing bash scripts
+#    (sources come in as volumes at run‑time)
+# ──────────────────────────────
+ENV ROSBAG_DIR=/home/${USERNAME}/rosbags
+RUN mkdir -p ${ROSBAG_DIR} \
+    && chown -R ${USERNAME}:${USERNAME} ${ROSBAG_DIR}
+
+# ──────────────────────────────
+# 6. Toolchain + rosdep
+#    (still running as root)
+# ──────────────────────────────
+# 1. Core build & ROS helpers
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    sudo git build-essential \
+    python3 python3-pip \
     python3-colcon-common-extensions \
-    ros-humble-rclpy \
-    ros-humble-geometry-msgs \
-    ros-humble-std-msgs \
-    # Add any other specific ros-humble-* packages that your ros_interface code uses
-    # (e.g., ros-humble-tf2-ros, ros-humble-nav2-msgs, etc.)
-    --no-install-recommends && \
+    python3-rosdep python3-rosdep-modules && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a ROS 2 workspace directory in the container
-WORKDIR /ros2_ws
+# 2. Convenience CLI tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    nano htop tmux net-tools tree && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy your 'ros_interface' package into the 'src' directory of the workspace
-# The path './ros_interface' is relative to the Docker build context (which is auto_shepherd_simulation/)
-COPY ros_interface ./src/ros_interface
+# 3. Extra ROS debs used by your workspace
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ros-humble-launch-testing \
+    ros-humble-tf-transformations \
+    ros-humble-launch-pytest \
+    ros-humble-ament-cmake-core \
+    libasio-dev \
+    ros-humble-joy-linux \
+    && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install ROS dependencies for your packages within the workspace
-# This command needs to source ROS 2 and be run in the correct context
-RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && \
-    rosdep update && \
-    rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys 'ros_interface'" # --skip-keys avoids rosdep trying to install your own package
+# 4. Deps used for CAN connection
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    iproute2 can-utils && \
+    rm -rf /var/lib/apt/lists/*
 
-# Build your ROS 2 workspace
-# This compiles C++ packages and installs Python packages (if setup.py is present)
-# RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && \
-#     colcon build --symlink-install"
 
-# Define the default command to run when the container starts.
-# It sources the main ROS 2 setup and your workspace's setup, then keeps the shell open.
-# This allows you to then run your ROS 2 nodes manually inside the container.
-CMD ["/bin/bash", "-c", "source /opt/ros/$ROS_DISTRO/setup.bash && source install/setup.bash && exec bash"]
+# 5. Python pip installs
+RUN python3 -m pip install --no-cache-dir --upgrade \
+    pip wheel \
+    setuptools==58.2.0 \
+    packaging==24.2 \
+    tmule==1.5.9 \
+    pyserial
 
-# Optional: If your ROS 2 nodes expose ports (e.g., for rosbridge_server, specific network interfaces)
-# EXPOSE 9090
+# ──────────────────────────────
+# 7. Drop privileges
+# ──────────────────────────────
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+# ──────────────────────────────
+# 8. Friendly hook:
+#    (source extension)
+# ──────────────────────────────
+RUN sed -i 's/^#\(force_color_prompt\)/\1/' /home/${USERNAME}/.bashrc
+
+# ── Friendly hook: source your extension if it exists ───────────────
+RUN echo '[ -f $HOME/bash_scripts/bashrc_extension.sh ] && \
+    source $HOME/bash_scripts/bashrc_extension.sh' \
+    >> /home/${USERNAME}/.bashrc
+
+# ──────────────────────────────
+# 9. Default shell
+# ──────────────────────────────
+CMD ["/bin/bash"]

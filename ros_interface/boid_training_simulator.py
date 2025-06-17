@@ -27,11 +27,13 @@ class DogSheepSimulator(Node):
     def _dog_cb(self, msg):
         timestep = msg.header.secs
         dog_name = msg.header.frame_id or 'dog'
+
         # Initialise storage
         if timestep not in self.dog_poses:
             self.dog_poses[timestep] = dict()
+
         # Save dog position at timestep
-        self.dog_poses[dog_name] = msg
+        self.dog_poses[timestep][dog_name] = msg
 
     def _sheep_cb(self, msg):
         timestep = msg.header.secs
@@ -44,14 +46,20 @@ class DogSheepSimulator(Node):
 
         # Execute simulation
         if str(timestep - N) in self.sheep_poses:
-            dog_path = [p for p in self.dog_poses[timestep-5:timestep]]
-            sheep_poses_0 = self.sheep_poses[timestep-5:]
-            sheep_poses_N = self.sheep_poses[timestep:]
-            weights = sheep_simulation.main(dog_path, sheep_poses_0, sheep_poses_N)
 
-        # Save weights
-        with open(self.weight_file_path, 'w') as f:
-            yaml.safe_dump(self.weight_data, f)
+            # Extract sheep poses and velocities
+            sheeps = dict()
+            sheeps['pose'] = self.sheep_poses[timestep]
+            sheeps['velocities'] = self.sheep_poses[timestep-1] - self.sheep_poses[timestep]
+
+            # Initialise simulation
+            sheep_simulation.main(dog_pose, sheep_initial_poses, sheep)
+
+        # Execute simulation
+        for i in range(N):
+            sheep_simulation.upate(1, self.dog_pose)
+            sheep_estimates = sheep_simulation.getstate()
+
 
 def main():
     rclpy.init()
