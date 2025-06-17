@@ -1,5 +1,6 @@
 # Group 5 – ShepSim
-![image](https://github.com/user-attachments/assets/6464faf6-a778-4ca6-b4d9-cbadd714b766)
+https://github.com/user-attachments/assets/8c2e009e-f565-402b-a478-c80df278cce3
+
 
 ## Goal: 
 Provided is a simulation environment using the Unity3D game engine. The environment contains controllable models for sheep and dogs. The overall goal for this group is to develop the environment to simulate the organic flocking of sheep, assess the impact of the robot dogs, and to explore the control of this influence towards achieving the target location. 
