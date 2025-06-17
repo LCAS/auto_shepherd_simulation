@@ -1,5 +1,5 @@
 # Group 5 – ShepSim
-https://github.com/user-attachments/assets/8c2e009e-f565-402b-a478-c80df278cce3
+![ezgif-44c6071baa7697](https://github.com/user-attachments/assets/52a8d676-e903-4354-8d7b-3ba9e8433f60)
 
 
 ## Goal: 
