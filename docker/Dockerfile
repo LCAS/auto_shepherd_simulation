@@ -94,13 +94,14 @@ RUN python3 -m pip install --no-cache-dir --upgrade \
     setuptools==58.2.0 \
     packaging==24.2 \
     tmule==1.5.9 \
-    pyserial\
+    pyserial \
+    pyproj \
     pygame
 
-# ──────────────────────────────
-# 7. Drop privileges
-# ──────────────────────────────
-USER ${USERNAME}
+    # ──────────────────────────────
+    # 7. Drop privileges
+    # ──────────────────────────────
+    USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
 # ──────────────────────────────

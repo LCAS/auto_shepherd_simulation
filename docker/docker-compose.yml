@@ -22,8 +22,8 @@ services:
 
       # enable mount for gui applications
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-
-      - ../rviz_config:/home/ros/.rviz2:rw
+      - ../configs/rviz:/home/ros/.rviz2:rw
+      - ../configs/map:/home/ros/map:rw
 
     environment:
       - BASE_WS=/home/ros/base_ws
