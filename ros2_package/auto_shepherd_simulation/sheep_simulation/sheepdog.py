@@ -14,7 +14,7 @@ class SheepDog:
         self.velocity = velocity
         
         # Physical properties
-        self.size = 20  # Size of the pig
+        self.size = 10  # Size of the pig
         self.color = (255, 192, 203)  # Pink color for Babe
         
         # Screen boundaries

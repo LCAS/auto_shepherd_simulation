@@ -25,31 +25,31 @@ class Sheep:
         
         # Movement state
         self.current_state = self.GRAZING  # Start in grazing state
-        self.walking_threshold = 1.0  # Threshold to start walking
+        self.walking_threshold = 1.0  # Threshold to start walking was 1.0
         self.moving_threshold = 2.0   # Threshold to start moving quickly
         
-        # Speed multipliers for different states
-        self.grazing_speed_multiplier = 0.05  # Slower when grazing
-        self.walking_speed_multiplier = 0.15  # Moderate speed when walking
-        self.moving_speed_multiplier = 1.2   # Faster when moving quickly
+        # Speed multipliers for different states TODO CHANGE THESE
+        self.grazing_speed_multiplier = 0.1  # Slower when grazing # original 0.05
+        self.walking_speed_multiplier = 0.15  # Moderate speed when walking # original 0.15
+        self.moving_speed_multiplier = 1.2   # Faster when moving quickly # original 1.2
         
-        # Flocking parameters
-        self.alignment_weight = 1.0
-        self.cohesion_weight = 0.23
+        # Flocking parameters (changed these defaults to match slider defaults in simulation.py)
+        self.alignment_weight = 3.0
+        self.cohesion_weight = 5.0
         self.separation_weight = 6.0
         
         # Physical properties
-        self.size = 10
+        self.size = 6 # was 10
         self.color = (255, 255, 255)  # White
         self.max_speed = 4
-        self.max_force = 0.2
+        self.max_force = 0.2 
         
         # Perception parameters
-        self.perception_radius = 50  # How far the sheep can see other sheep
+        self.perception_radius = 100  # How far the sheep can see other sheep (was 50, needs same as dog radius)
         self.protected_radius = 20   # Minimum distance sheep try to maintain from each other
         self.boundary_margin = 40    # Distance from edge where sheep start to turn
-        self.dog_repulsion_weight = 8.0  # Weight for avoiding the dog
-        self.dog_repulsion_radius = 100  # How far the sheep can sense the dog
+        self.dog_repulsion_weight = 6.0  # Weight for avoiding the dog (was 8.0)
+        self.dog_repulsion_radius = 100  # How far the sheep can sense the dog (should be same as perception radius)
 
     def get_state(self):
         """Return current state in the standard format"""
@@ -70,8 +70,20 @@ class Sheep:
             self.current_state = self.WALKING
         else:
             self.current_state = self.GRAZING
-            # Reset velocity and acceleration when grazing
-            self.velocity = [0, 0]
+            # Reset velocity and acceleration when grazing to be still with some random movement
+            rand_move_x = random.random()
+            if rand_move_x < 0.99:
+                rand_move_x = 0
+            else:
+                rand_move_x = random.uniform(-4, 4)
+
+            rand_move_y = random.random()
+            if rand_move_y < 0.99:
+                rand_move_y = 0
+            else:
+                rand_move_y = random.uniform(-4, 4)
+
+            self.velocity = [rand_move_x, rand_move_y]
             self.acceleration = [0, 0]
 
     def apply_force(self, force):
@@ -282,7 +294,8 @@ class Sheep:
             # Normalize the direction
             if distance > 0:
                 to_dog[0] = to_dog[0] / distance
-                to_dog[1] = to_dog[1] / distance
+                to_dog[1] = to_dog[1] / distance          
+            
             # Apply repulsion force
             return [
                 to_dog[0] * strength * self.dog_repulsion_weight,
