@@ -28,6 +28,7 @@ echo "Docker Compose cleanup completed."
 echo "Starting Docker Compose service '${SERVICE_NAME}' in interactive mode..."
 
 docker compose -f "${COMPOSE_FILE}" run \
+    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
     -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
     "${DOCKER_RUN_ARGS[@]}" \
     "${SERVICE_NAME}" bash
