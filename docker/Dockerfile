@@ -88,7 +88,7 @@ RUN apt-get update && \
 # 2. Convenience CLI tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    nano htop tmux net-tools tree && \
+    vim nano htop tmux net-tools tree && \
     rm -rf /var/lib/apt/lists/*
 
 # 3. Extra ROS debs used by your workspace

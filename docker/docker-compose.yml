@@ -45,7 +45,8 @@ services:
       # - ENVIRONMENT_WS=/home/ros/environment_ws
       # - BASH_SCRIPTS=/home/ros/bash_scripts
       # - ROSBAGS_DIR=/home/ros/rosbags
-      - DISPLAY=:0
+      # - DISPLAY=:0
+      - DISPLAY=${HOST_DISPLAY_VAR:-:0}
       - QT_X11_NO_MITSHM=1
 
 volumes:
