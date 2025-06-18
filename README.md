@@ -42,3 +42,10 @@ If you make changes to nodes just run `bash` in your terminal or run the followi
 ```
 source ~/.bashrc
 ```
+
+
+X11 forwarding
+```
+sudo apt-get install libxcb-randr0-dev libxcb-xtest0-dev libxcb-xinerama0-dev libxcb-shape0-dev libxcb-xkb-dev
+export QT_DEBUG_PLUGINS=1
+```
