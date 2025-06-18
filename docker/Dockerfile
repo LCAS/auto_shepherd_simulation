@@ -3,7 +3,6 @@
 # ──────────────────────────────
 FROM osrf/ros:humble-desktop-full
 
-# before any 'apt-get update' that touches ros2-testing
 RUN apt-get update && apt-get install -y --no-install-recommends gnupg2 \
     && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F42ED6FBAB17C654
 
@@ -34,27 +33,6 @@ RUN apt-get update && apt-get install -y sudo git \
 ENV BASE_WS=/home/${USERNAME}/base_ws
 RUN mkdir -p ${BASE_WS}/src \
     && chown -R ${USERNAME}:${USERNAME} ${BASE_WS}
-
-# # 2. Empty workspace skeleton for exteroceptive sensors
-# ENV SENSORS_WS=/home/${USERNAME}/sensors_ws
-# RUN mkdir -p ${SENSORS_WS}/src \
-#  && chown -R ${USERNAME}:${USERNAME} ${SENSORS_WS}
-
-# # 3. Empty workspace skeleton for autonomy-related packages
-# ENV AUTONOMY_WS=/home/${USERNAME}/autonomy_ws
-# RUN mkdir -p ${AUTONOMY_WS}/src \
-#  && chown -R ${USERNAME}:${USERNAME} ${AUTONOMY_WS}
-
-# # 4. Empty workspace skeleton for contorl and task-related packages
-# ENV CONTROL_WS=/home/${USERNAME}/control_ws
-# RUN mkdir -p ${CONTROL_WS}/src \
-#  && chown -R ${USERNAME}:${USERNAME} ${CONTROL_WS}
-
-
-# # 5. Empty workspace skeleton for contorl and task-related packages
-# ENV ENVIRONMENT_WS=/home/${USERNAME}/environment_ws
-# RUN mkdir -p ${ENVIRONMENT_WS}/src \
-#  && chown -R ${USERNAME}:${USERNAME} ${ENVIRONMENT_WS}
 
 # ──────────────────────────────
 # 4. Empty directory for storing bash scripts
