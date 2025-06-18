@@ -2,10 +2,10 @@
 ![ezgif-44c6071baa7697](https://github.com/user-attachments/assets/52a8d676-e903-4354-8d7b-3ba9e8433f60)
 
 
-## Goal: 
-Provided is a simulation environment using the Unity3D game engine. The environment contains controllable models for sheep and dogs. The overall goal for this group is to develop the environment to simulate the organic flocking of sheep, assess the impact of the robot dogs, and to explore the control of this influence towards achieving the target location. 
+## Goal:
+Provided is a simulation environment using the Unity3D game engine. The environment contains controllable models for sheep and dogs. The overall goal for this group is to develop the environment to simulate the organic flocking of sheep, assess the impact of the robot dogs, and to explore the control of this influence towards achieving the target location.
 
-## Preparation in Advance:  
+## Preparation in Advance:
 - Ensure you have available 15GB for Unity 3D and the [ShepSim](https://github.com/LCAS/auto_shepherd_simulation) simulation files
 - Install [Unity Hub](https://unity.com/download) and through it, Unity Editor 6000.0.45f1
 - Following the [Getting-Started](https://github.com/LCAS/auto_shepherd_simulation/wiki/Getting-Started) instructions, ensure the simulation ready to run
@@ -16,27 +16,36 @@ Provided is a simulation environment using the Unity3D game engine. The environm
 ## Activities:
 
 ### Primary Activity:
-`Prediction and Control Server` – develop a control strategy for influencing the movement of the sheep around the field by the dog. 
+`Prediction and Control Server` – develop a control strategy for influencing the movement of the sheep around the field by the dog.
 
 ### Secondary Activity:
-`Boid Training Server` – develop a closed-loop natural systems training server, using inputs from the Computer Vision group to refine the sheep Boid parameters. 
+`Boid Training Server` – develop a closed-loop natural systems training server, using inputs from the Computer Vision group to refine the sheep Boid parameters.
 
 ### Stretch Activity:
-`Simulation Server` – work with the Drone and the Computer Vision groups to develop the simulation for piping synthetic data generation of drone images. 
+`Simulation Server` – work with the Drone and the Computer Vision groups to develop the simulation for piping synthetic data generation of drone images.
 
 ## Outcomes:
-Through these activities, the group will gain experience in natural system simulation and multi-robot cooperation. These activities will culminate in an open-access cross-platform system for experimentation. By the end of the week, group members will have prepared enough in this work to begin considerations of quantifiable experimentations and exploration into potential publication opportunities. 
+Through these activities, the group will gain experience in natural system simulation and multi-robot cooperation. These activities will culminate in an open-access cross-platform system for experimentation. By the end of the week, group members will have prepared enough in this work to begin considerations of quantifiable experimentations and exploration into potential publication opportunities.
 
 ## Future Engagement:
-The resulting simulation will be used as a framework for many experiments going forward. Group members will have opportunities to engage with such works and subsequent publications. 
+The resulting simulation will be used as a framework for many experiments going forward. Group members will have opportunities to engage with such works and subsequent publications.
 ___
-Run docker container
 
-Build it
+## Building the ros container
+To start and build up the docker container clone the repo
 ```
-docker build .
+cd docker
+./docker_start.sh
 ```
-Run it
+
+If you make changes to nodes just run `bash` in your terminal or run the following
 ```
-docker run -it --rm     --name ros2_build_debugger     --net=host     auto_shepherd_ros2_app:humble /bin/bash
+source ~/.bashrc
+```
+
+
+X11 forwarding
+```
+sudo apt-get install libxcb-randr0-dev libxcb-xtest0-dev libxcb-xinerama0-dev libxcb-shape0-dev libxcb-xkb-dev
+export QT_DEBUG_PLUGINS=1
 ```
