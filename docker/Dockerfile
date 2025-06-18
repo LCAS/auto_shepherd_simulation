@@ -96,6 +96,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade \
     tmule==1.5.9 \
     pyserial \
     pyproj \
+    pygame
 
     # ──────────────────────────────
     # 7. Drop privileges

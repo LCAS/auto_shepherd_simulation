@@ -1,8 +1,8 @@
 import pygame
 import sys
 import random
-from sheep import Sheep
-from sheepdog import SheepDog, SheepDogController
+from auto_shepherd_simulation.sheep_simulation.sheep import Sheep
+from auto_shepherd_simulation.sheep_simulation.sheepdog import SheepDog, SheepDogController
 
 
 
@@ -167,11 +167,11 @@ class Game:
         # Create controller for keyboard input
         self.sheepdog_controller = SheepDogController(self.simulation.sheepdog, width, height)
         
-        # Create sliders
+        # Create sliders Slider(x, y, width, height, min_val, max_val, initial_val, name)
         self.sliders = {
-            'alignment': Slider(50, height - 100, 200, 10, 0, 2, 1.0, "Alignment"),
-            'cohesion': Slider(50, height - 70, 200, 10, 0, 2, 0.23, "Cohesion"),
-            'separation': Slider(50, height - 40, 200, 10, 0, 10, 6, "Separation")
+            'alignment': Slider(50, height - 100, 200, 10, 0, 10, 3.0, "Alignment"), # change from 1.0 to 2.0
+            'cohesion': Slider(50, height - 70, 200, 10, 0, 10, 5.0, "Cohesion"), # change from 0.23 to 5.0
+            'separation': Slider(50, height - 40, 200, 10, 0, 10, 6.0, "Separation") # keep at 6.0
         }
         
         # Instructions
