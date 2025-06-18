@@ -1,8 +1,8 @@
 import pygame
 import sys
 import random
-from sheep import Sheep
-from sheepdog import SheepDog, SheepDogController
+from auto_shepherd_simulation.sheep_simulation.sheep import Sheep
+from auto_shepherd_simulation.sheep_simulation.sheepdog import SheepDog, SheepDogController
 
 
 

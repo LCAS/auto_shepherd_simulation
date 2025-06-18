@@ -38,7 +38,7 @@ def cost(x, y, xd, yd, xc, yc):
 
 # --- keep your maths helpers and find_best_dog_position -----------------
 def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
-                           radius_d=1.5, n_candidates=30):
+                           radius_d=1.5, n_candidates=30, early_exit_threshold=10):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
     (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
     radius_sheep += .5
@@ -53,7 +53,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
         angle_start = np.arctan2(yd - ymean, xd - xmean)
         angle_range = (angle_start - angle_a, angle_start + angle_a)
-        random_angles = np.random.uniform(angle_range[0], angle_range[1], 10)
+        random_angles = np.random.uniform(angle_range[0], angle_range[1], n_candidates)
         points = np.asarray([xmean, ymean]) + radius_sheep * np.column_stack([np.cos(random_angles), np.sin(random_angles)])
 
         # optimise new dog position
@@ -66,7 +66,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
                 optimal_xd, optimal_yd = new_xd, new_yd
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
-            if i-last_update > 10: break
+            if i-last_update > early_exit_threshold: break
     return optimal_xd, optimal_yd, points
 
 def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, points, radius_d=1.5):
