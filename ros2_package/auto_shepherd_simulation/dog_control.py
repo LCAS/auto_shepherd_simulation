@@ -63,7 +63,7 @@ class DogController(Node):
         self.get_logger().debug(f'Cmd ({xd_opt:.2f}, {yd_opt:.2f})')
 
         # plot
-        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
+        plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
         
 
 # ----------------------------------------------------------------------
