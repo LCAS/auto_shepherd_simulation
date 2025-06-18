@@ -30,7 +30,7 @@ echo "Starting Docker Compose service '${SERVICE_NAME}' in interactive mode..."
 # docker compose -f "${COMPOSE_FILE}" run --rm "${SERVICE_NAME}" bash
 docker compose -f "${COMPOSE_FILE}" run \
     -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
-    # "${DOCKER_RUN_ARGS[@]}" \
+    "${DOCKER_RUN_ARGS[@]}" \
     "${SERVICE_NAME}" bash
 
 echo "Docker container session ended."
