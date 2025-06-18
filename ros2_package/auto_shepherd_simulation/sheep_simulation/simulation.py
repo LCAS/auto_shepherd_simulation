@@ -1,6 +1,9 @@
 import pygame
 import sys
 import random
+import numpy as np
+import yaml
+import os
 from auto_shepherd_simulation.sheep_simulation.sheep import Sheep
 from auto_shepherd_simulation.sheep_simulation.sheepdog import SheepDog, SheepDogController
 
@@ -15,6 +18,7 @@ BLACK = (0, 0, 0)
 GREEN = (34, 139, 34)  # Grass color
 WHITE = (255, 255, 255)
 GRAY = (128, 128, 128)
+LIGHTGREEN = (40, 160, 40)
 
 
 
@@ -51,21 +55,137 @@ class Slider:
             self.value = self.min_val + (rel_x / self.rect.width) * (self.max_val - self.min_val)
             self.handle_rect.x = self.rect.x + rel_x - 5
 
+class CoordinateTransformer:
+    def __init__(self, field_boundary, screen_width, screen_height):
+        """Initialize coordinate transformer with field boundary and screen dimensions
+        
+        Args:
+            field_boundary: List of [x, y] points in meters defining the field boundary
+            screen_width: Width of the screen in pixels
+            screen_height: Height of the screen in pixels
+        """
+        self.field_boundary = np.array(field_boundary)
+        
+        # Calculate field bounds in real-world coordinates
+        self.field_min_x = np.min(self.field_boundary[:, 0])
+        self.field_max_x = np.max(self.field_boundary[:, 0])
+        self.field_min_y = np.min(self.field_boundary[:, 1])
+        self.field_max_y = np.max(self.field_boundary[:, 1])
+        
+        # Screen dimensions
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        
+        # Calculate scaling factors
+        self.scale_x = screen_width / (self.field_max_x - self.field_min_x)
+        self.scale_y = screen_height / (self.field_max_y - self.field_min_y)
+        
+        # Use the smaller scale to maintain aspect ratio
+        self.scale = min(self.scale_x, self.scale_y)
+        
+        # Calculate offsets to center the field
+        self.offset_x = (screen_width - (self.field_max_x - self.field_min_x) * self.scale) / 2
+        self.offset_y = (screen_height - (self.field_max_y - self.field_min_y) * self.scale) / 2
+    
+    def world_to_screen(self, x, y):
+        """Convert real-world coordinates to screen coordinates"""
+        screen_x = (x - self.field_min_x) * self.scale + self.offset_x
+        screen_y = (y - self.field_min_y) * self.scale + self.offset_y
+        return screen_x, screen_y
+    
+    def screen_to_world(self, screen_x, screen_y):
+        """Convert screen coordinates to real-world coordinates"""
+        x = (screen_x - self.offset_x) / self.scale + self.field_min_x
+        y = (screen_y - self.offset_y) / self.scale + self.field_min_y
+        return x, y
+    
+    def is_point_in_field(self, x, y):
+        """Check if a point is inside the field boundary using ray casting algorithm"""
+        point = np.array([x, y])
+        n = len(self.field_boundary)
+        inside = False
+        
+        p1x, p1y = self.field_boundary[0]
+        for i in range(n + 1):
+            p2x, p2y = self.field_boundary[i % n]
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+                        if p1y != p2y:
+                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+            p1x, p1y = p2x, p2y
+            
+        return inside
+
+    def get_closest_boundary_point(self, x, y):
+        """Find the closest point on the field boundary to the given point"""
+        point = np.array([x, y])
+        min_dist = float('inf')
+        closest_point = None
+        
+        # Check each line segment of the boundary
+        for i in range(len(self.field_boundary)):
+            p1 = self.field_boundary[i]
+            p2 = self.field_boundary[(i + 1) % len(self.field_boundary)]
+            
+            # Vector from p1 to p2
+            line_vec = p2 - p1
+            # Vector from p1 to point
+            point_vec = point - p1
+            
+            # Project point_vec onto line_vec
+            line_len = np.linalg.norm(line_vec)
+            line_unitvec = line_vec / line_len
+            projection = np.dot(point_vec, line_unitvec)
+            
+            # Clamp projection to line segment
+            projection = max(0, min(line_len, projection))
+            
+            # Calculate closest point on line segment
+            closest = p1 + projection * line_unitvec
+            
+            # Calculate distance to closest point
+            dist = np.linalg.norm(point - closest)
+            
+            if dist < min_dist:
+                min_dist = dist
+                closest_point = closest
+        
+        return closest_point
+
 class Simulation:
-    def __init__(self, width, height, sheep_states=None, sheepdog_state=None):
-        self.width = width
-        self.height = height
+    def __init__(self, field_boundary, screen_width=800, screen_height=600, sheep_states=None, sheepdog_state=None):
+        """Initialize simulation with field boundary
+        
+        Args:
+            field_boundary: List of [x, y] points in meters defining the field boundary
+            screen_width: Width of the screen in pixels
+            screen_height: Height of the screen in pixels
+            sheep_states: Optional list of sheep states
+            sheepdog_state: Optional sheepdog state
+        """
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        
+        # Initialize coordinate transformer
+        self.coord_transformer = CoordinateTransformer(field_boundary, screen_width, screen_height)
         
         # Create the sheepdog
         if sheepdog_state is None:
+            # Place sheepdog at center of field in real-world coordinates
+            center_x = (self.coord_transformer.field_max_x + self.coord_transformer.field_min_x) / 2
+            center_y = (self.coord_transformer.field_max_y + self.coord_transformer.field_min_y) / 2
             sheepdog_state = {
-                'position': [width/2, height/2],
+                'position': [center_x, center_y],
                 'velocity': [0, 0]
             }
         self.sheepdog = SheepDog(
             position=sheepdog_state['position'],
             velocity=sheepdog_state['velocity'],
-            yaw=0  # Initial yaw
+            yaw=0,  # Initial yaw
+            coord_transformer=self.coord_transformer
         )
         
         # Create a list of sheep
@@ -81,20 +201,23 @@ class Simulation:
     def _initialize_sheep(self, sheep_states=None):
         """Initialize sheep with given states or random positions"""
         if sheep_states is None:
-            # Initialize with random positions
+            # Initialize with random positions within field boundary
             for _ in range(self.num_sheep):
-                margin = 50
-                position = [
-                    random.uniform(margin, self.width - margin),
-                    random.uniform(margin, self.height - margin)
-                ]
-                velocity = [0, 0]  # Start with zero velocity
-                self.sheep_list.append(Sheep(
-                    position=position,
-                    velocity=velocity,
-                    width=self.width,
-                    height=self.height
-                ))
+                while True:
+                    # Generate random position in real-world coordinates
+                    x = random.uniform(self.coord_transformer.field_min_x, self.coord_transformer.field_max_x)
+                    y = random.uniform(self.coord_transformer.field_min_y, self.coord_transformer.field_max_y)
+                    
+                    # Check if position is inside field boundary
+                    if self.coord_transformer.is_point_in_field(x, y):
+                        position = [x, y]
+                        velocity = [0, 0]  # Start with zero velocity
+                        self.sheep_list.append(Sheep(
+                            position=position,
+                            velocity=velocity,
+                            coord_transformer=self.coord_transformer
+                        ))
+                        break
         else:
             # Initialize with given states
             for state in sheep_states:
@@ -105,37 +228,18 @@ class Simulation:
                 self.sheep_list.append(Sheep(
                     position=position,
                     velocity=velocity,
-                    width=self.width,
-                    height=self.height
+                    coord_transformer=self.coord_transformer
                 ))
 
-    def update(self, sheepdog_state=None):
+    def update(self, dt):
         """Update the simulation state
         
         Args:
-            sheepdog_state: Optional dictionary with 'position' and 'velocity' keys.
-                          If None, the sheepdog's current state is maintained.
+            dt: Time step in seconds
         """
-        # Update sheepdog state if provided
-        if sheepdog_state is not None:
-            if not isinstance(sheepdog_state, dict) or 'position' not in sheepdog_state:
-                raise ValueError("Sheepdog state must be provided as a dictionary with 'position' key")
-            self.sheepdog.x = sheepdog_state['position'][0]
-            self.sheepdog.y = sheepdog_state['position'][1]
-            if 'velocity' in sheepdog_state:
-                self.sheepdog.velocity = sheepdog_state['velocity']
-            self.sheepdog.set_screen_bounds(self.width, self.height)
-        
         # Update each sheep
         for sheep in self.sheep_list:
-            # Update weights
-            sheep.alignment_weight = self.alignment_weight
-            sheep.cohesion_weight = self.cohesion_weight
-            sheep.separation_weight = self.separation_weight
-            
-            # Update position
-            sheep.flock(self.sheep_list, self.sheepdog)
-            sheep.update()
+            sheep.update(dt, self.sheep_list, self.sheepdog)
 
     def get_state(self):
         """Return the current state of the simulation"""
@@ -144,34 +248,59 @@ class Simulation:
             'sheepdog': self.sheepdog.get_state()
         }
 
+    def draw(self, screen):
+        """Draw the simulation state"""
+        # Fill the screen with grass color
+        screen.fill(GREEN)
+        
+        # Draw field boundary
+        screen_points = []
+        for point in self.coord_transformer.field_boundary:
+            screen_x, screen_y = self.coord_transformer.world_to_screen(point[0], point[1])
+            screen_points.append((screen_x, screen_y))
+        pygame.draw.polygon(screen, BLACK, screen_points, 2)
+        
+        # Draw each sheep
+        for sheep in self.sheep_list:
+            sheep.draw(screen)
+        
+        # Draw the sheepdog
+        self.sheepdog.draw(screen)
+
 class Game:
     def __init__(self, width, height):
         # Initialize Pygame
         pygame.init()
-        
-        # Screen setup
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("Sheep Flocking Simulation")
+        pygame.display.set_caption("Sheep Simulation")
+        self.clock = pygame.time.Clock()
+        self.running = True
         
         # Colors
         self.BLACK = (0, 0, 0)
         self.GREEN = (34, 139, 34)  # Grass color
         self.WHITE = (255, 255, 255)
         self.GRAY = (128, 128, 128)
+        self.LIGHTGREEN = (40,160,40)
         
-        # Create simulation
-        self.simulation = Simulation(width, height)
+        # Load map configuration
+        map_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
+                               'configs', 'map', 'map1.yaml')
+        field_boundary = load_map_config(map_file)
         
-        # Create controller for keyboard input
+        # Initialize simulation
+        self.simulation = Simulation(field_boundary, width, height)
+        
+        # Initialize sheepdog controller
         self.sheepdog_controller = SheepDogController(self.simulation.sheepdog, width, height)
         
-        # Create sliders Slider(x, y, width, height, min_val, max_val, initial_val, name)
+        # Initialize sliders
         self.sliders = {
-            'alignment': Slider(50, height - 100, 200, 10, 0, 10, 3.0, "Alignment"), # change from 1.0 to 2.0
-            'cohesion': Slider(50, height - 70, 200, 10, 0, 10, 5.0, "Cohesion"), # change from 0.23 to 5.0
-            'separation': Slider(50, height - 40, 200, 10, 0, 10, 6.0, "Separation") # keep at 6.0
+            'alignment': Slider(10, height - 100, 200, 20, 0, 10, 3.0, "Alignment"),
+            'cohesion': Slider(10, height - 70, 200, 20, 0, 10, 5.0, "Cohesion"),
+            'separation': Slider(10, height - 40, 200, 20, 0, 10, 2.5, "Separation")
         }
         
         # Instructions
@@ -197,33 +326,42 @@ class Game:
 
     def update(self):
         """Update game state"""
-        # Get keyboard state for continuous movement
+        # Get time step in seconds
+        dt = self.clock.get_time() / 1000.0  # Convert milliseconds to seconds
+        
+        # Update simulation
+        self.simulation.update(dt)
+        
+        # Update sheepdog controller
         keys = pygame.key.get_pressed()
+        self.sheepdog_controller.update(keys, dt)
         
-        # Update sheepdog position based on keyboard input
-        self.sheepdog_controller.update(keys)
+        # Update sliders
+        for slider in self.sliders.values():
+            slider.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {'pos': pygame.mouse.get_pos()}))
         
-        # Get current sheepdog state
-        sheepdog_state = self.simulation.sheepdog.get_state()
-        
-        # Update simulation with current sheepdog state
-        self.simulation.update(sheepdog_state)
-        
-        # Update simulation parameters from sliders
+        # Update simulation parameters
         self.simulation.alignment_weight = self.sliders['alignment'].value
         self.simulation.cohesion_weight = self.sliders['cohesion'].value
         self.simulation.separation_weight = self.sliders['separation'].value
 
     def draw(self):
         """Draw the game state"""
-        # Fill the screen with grass color
         self.screen.fill(self.GREEN)
 
-        # Draw each sheep
+        # Draw field boundary as a visible polygon
+        boundary_points = [
+            self.simulation.coord_transformer.world_to_screen(x, y)
+            for x, y in self.simulation.coord_transformer.field_boundary
+        ]
+        pygame.draw.polygon(self.screen, self.BLACK, boundary_points, width=4)  # Thicker black outline
+        pygame.draw.polygon(self.screen, self.LIGHTGREEN, boundary_points, width=0)  # Fill with light blue for visibility
+
+        # Draw sheep
         for sheep in self.simulation.sheep_list:
             sheep.draw(self.screen)
 
-        # Draw the sheepdog
+        # Draw sheepdog
         self.simulation.sheepdog.draw(self.screen)
 
         # Draw sliders
@@ -235,22 +373,44 @@ class Game:
             text_surface = self.font.render(text, True, self.WHITE)
             self.screen.blit(text_surface, (self.width - 250, 20 + i * 25))
 
-        # Update the display
         pygame.display.flip()
 
     def run(self):
         """Run the game loop"""
-        clock = pygame.time.Clock()
-        running = True
-
-        while running:
-            running = self.handle_events()
+        while self.running:
+            self.running = self.handle_events()
             self.update()
             self.draw()
-            clock.tick(60)
+            self.clock.tick(60)
 
         pygame.quit()
         sys.exit()
+
+def load_map_config(map_file):
+    """Load map configuration from YAML file and convert coordinates to meters"""
+    with open(map_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Convert lat/lon to meters (approximate conversion)
+    # Using a simple conversion where 1 degree of latitude ≈ 111,320 meters
+    # and 1 degree of longitude ≈ 111,320 * cos(latitude) meters
+    boundary_points = []
+    for point in config['field_boundary']:
+        lat = point['latitude']
+        lon = point['longitude']
+        # Convert to meters relative to the first point
+        if not boundary_points:
+            ref_lat = lat
+            ref_lon = lon
+            x = 0
+            y = 0
+        else:
+            # Convert lat/lon differences to meters
+            x = (lon - ref_lon) * 111320 * np.cos(np.radians(ref_lat))
+            y = (lat - ref_lat) * 111320
+        boundary_points.append([x, y])
+    
+    return boundary_points
 
 if __name__ == "__main__":
     # Create and run the game
