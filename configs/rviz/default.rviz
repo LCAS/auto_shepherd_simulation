@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Grid1
         - /Path1
         - /Path1/Topic1
       Splitter Ratio: 0.5
@@ -32,7 +33,7 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 1
+      Cell Size: 10
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
@@ -46,7 +47,7 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 10
+      Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
       Value: true
     - Alpha: 1
@@ -76,6 +77,21 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /FieldBoundaryPath
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        dog_velocity: true
+        sheep: true
+        sheep_velocity: true
+        sheepdog: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /simulation_markers
       Value: true
   Enabled: true
   Global Options:
@@ -123,16 +139,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 477.786376953125
+      Distance: 1475.8636474609375
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 332.9386291503906
+        Y: 305.6679382324219
+        Z: -117.16397857666016
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -159,5 +175,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 454
-  Y: 112
+  X: 250
+  Y: 73
