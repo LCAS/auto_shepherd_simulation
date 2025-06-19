@@ -15,10 +15,13 @@ except:
 map_polygon = Path(np.array(mc.map_coords_xy_meters))
 #check if points are valid using `map_polygon.contains_point(point)`
 
-def smallest_enclosing_circle(points):
-    center = np.mean(points, axis=0)
-    radius = np.max(np.linalg.norm(points - center, axis=1))
-    return center, radius
+def circle_around_points(points):
+    diff = points[:, np.newaxis, :] - points[np.newaxis, :, :]
+    distances = np.sqrt(np.sum(diff**2, axis=-1))
+    max_distance_indices = np.unravel_index(np.argmax(distances), distances.shape)
+    midpoint = (points[max_distance_indices[0]] + points[max_distance_indices[1]])/2
+    radius = distances[max_distance_indices[0], max_distance_indices[1]] / 2
+    return midpoint, radius
 
 def get_direction(x, y, xd, yd):
     dx = x - xd
@@ -63,7 +66,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
                            radius_d=1.4, n_candidates=15, early_exit_threshold=5,
                            default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
-    (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
+    (xmean, ymean), radius_sheep = circle_around_points(np.stack([x, y], axis=1))
     radius_sheep += .5
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
 
