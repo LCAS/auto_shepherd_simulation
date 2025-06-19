@@ -69,6 +69,32 @@ RUN apt-get update && \
     vim nano htop tmux net-tools tree && \
     rm -rf /var/lib/apt/lists/*
 
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxkbcommon-x11-0 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-xinerama0 \
+    libxcb-xinput0 \
+    libxcb-xfixes0 \
+    libxcb-shape0 \
+    libxcb-cursor0 \
+    libgl1-mesa-glx \
+    libegl1 \
+    libxcb-xkb1 \
+    libfontconfig1 \
+    libfreetype6 \
+    xterm \
+    # Optional: If you need to debug locale issues with Qt
+    # locales \
+    # locales-all \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
 # 3. Extra ROS debs used by your workspace
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -93,15 +119,20 @@ RUN python3 -m pip install --no-cache-dir --upgrade \
     pip wheel \
     setuptools==58.2.0 \
     packaging==24.2 \
-    tmule==1.5.9 \
-    pyserial \
+    numpy \
+    scipy \
+    matplotlib \
     pyproj \
-    pygame
+    pygame \
+    scikit-learn \
+    opencv-python \
+    pyserial \
+    tmule==1.5.9
 
-    # ──────────────────────────────
-    # 7. Drop privileges
-    # ──────────────────────────────
-    USER ${USERNAME}
+# ──────────────────────────────
+# 7. Drop privileges
+# ──────────────────────────────
+USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
 # ──────────────────────────────

@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from nav_msgs.msg import Path
 from std_msgs.msg import Float64MultiArray
 import numpy as np
@@ -13,11 +13,11 @@ class DogController(Node):
 
         # publishers / subscribers ---------------------------------------
         self.cmd_pub = self.create_publisher(
-            Float64MultiArray, '/dog/command', 10)   # :contentReference[oaicite:2]{index=2}
+            PoseStamped, '/dog/command', 10)   # :contentReference[oaicite:2]{index=2}
 
         self.create_subscription(PoseStamped, '/dog/pose',
                                  self._dog_cb, 10)   # :contentReference[oaicite:3]{index=3}
-        self.create_subscription(Path, '/sheep/poses',
+        self.create_subscription(Path, '/sheep/poses_sim',
                                  self._sheep_cb, 10) # :contentReference[oaicite:4]{index=4}
         self.create_subscription(PoseStamped, '/sheep/goal_pose',
                                  self._goal_cb, 10)
@@ -57,13 +57,16 @@ class DogController(Node):
 
         xd_opt, yd_opt, points = find_best_dog_position(xs, ys, xd, yd, xc, yc)
 
-        cmd = Float64MultiArray()
-        cmd.data = [float(xd_opt), float(yd_opt)]
-        self.cmd_pub.publish(cmd)
+        ps = PoseStamped()
+        ps.header.stamp = self.get_clock().now().to_msg()
+        ps.header.frame_id = "map"        # or any frame you prefer
+        ps.pose.position = Point(x=float(xd_opt), y=float(yd_opt), z=0.0)
+        ps.pose.orientation = Quaternion(w=1.0)  # identity; adjust if needed
+        self.cmd_pub.publish(ps)
         self.get_logger().debug(f'Cmd ({xd_opt:.2f}, {yd_opt:.2f})')
 
         # plot
-        plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
+        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
         
 
 # ----------------------------------------------------------------------
