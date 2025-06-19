@@ -1,22 +1,20 @@
 import rclpy
 from rclpy.node import Node
-# from geometry_msgs.msg import PolygonStamped, Point32 # No longer used for main path
-from nav_msgs.msg import Path # New: Import Path message
-from geometry_msgs.msg import PoseStamped, Point, Quaternion # PoseStamped, Point (for position), Quaternion (for orientation)
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
 import yaml
 import os
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from tf_transformations import quaternion_from_euler
+from typing import List, Tuple
 
-# For UTM conversion
-from pyproj import CRS, Transformer
-from tf_transformations import quaternion_from_euler # Helper for creating quaternions
+from auto_shepherd_simulation.utils.geo_converter import MapConverter, load_coords_from_yaml
 
 class MapperNode(Node):
     def __init__(self):
         super().__init__('mapper_node')
-
         self.declare_parameter('map_file_path', '/home/ros/map/map1.yaml')
 
         # Define the QoS profile for a latched topic
@@ -26,144 +24,133 @@ class MapperNode(Node):
             durability=DurabilityPolicy.TRANSIENT_LOCAL
         )
 
-        # Change publisher type to Path
+        # Publisher for the Path message
         self.publisher_ = self.create_publisher(
             Path,
-            'FieldBoundaryPath', # New topic name for clarity
+            'FieldBoundaryPath',
             qos_profile
         )
 
+        # Static Transform Broadcaster for the 'field_frame'
         self.static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
-        # UTM Conversion setup (for Lincoln, UK - UTM Zone 30N)
-        wgs84_crs = CRS("EPSG:4326") # Latitude, Longitude
-        utm30n_crs = CRS("EPSG:32630") # WGS 84 / UTM Zone 30N (meters)
-        self.transformer = Transformer.from_crs(wgs84_crs, utm30n_crs)
+        # --- Integration with geo_converter.py ---
 
-        self.polygon_data = self.load_map_from_yaml()
-        if not self.polygon_data:
-            self.get_logger().error("Failed to load map data from specified path. Shutting down.")
+        # 1. Get the map file path from parameters
+        map_file_path = self.get_parameter('map_file_path').get_parameter_value().string_value
+        self.get_logger().info(f"Attempting to load map for MapperNode from: {map_file_path}")
+
+        # 2. Load raw (lat, lon) coordinates from the YAML file using the utility function
+        try:
+            raw_latlon_coords = load_coords_from_yaml(map_file_path)
+            if not raw_latlon_coords:
+                self.get_logger().error("Loaded map data is empty. Shutting down.")
+                rclpy.shutdown()
+                return
+        except (FileNotFoundError, ValueError) as e:
+            self.get_logger().error(f"Failed to load map data from YAML: {e}. Shutting down.")
             rclpy.shutdown()
             return
 
-        # Perform UTM conversion on loaded data
-        self.utm_poses = self.convert_to_utm_poses()
-        if not self.utm_poses:
-            self.get_logger().error("Failed to convert polygon data to UTM poses. Shutting down.")
+        # 3. Initialize the MapConverter with the raw LatLon coordinates
+        try:
+            self.map_converter = MapConverter(raw_latlon_coords)
+            map_data = self.map_converter.get_map_data() # Get processed data from the converter
+
+            # Store the map's calculated origin (in UTM)
+            self.origin_utm_x = map_data['origin_utm_x']
+            self.origin_utm_y = map_data['origin_utm_y']
+
+            # Get the relative X, Y meters for the path
+            self.path_xy_meters = map_data['map_coords_xy_meters']
+
+            self.get_logger().info(f"Map converted. Origin (UTM X, Y): ({self.origin_utm_x:.3f}, {self.origin_utm_y:.3f})")
+
+        except ValueError as e:
+            self.get_logger().error(f"Error initializing MapConverter: {e}. Shutting down.")
             rclpy.shutdown()
             return
+
+        # 4. Create PoseStamped messages for the Path from the relative meter coordinates
+        self.path_poses = self._create_path_poses(self.path_xy_meters)
+        if not self.path_poses:
+            self.get_logger().error("Failed to create Path poses from converted data. Shutting down.")
+            rclpy.shutdown()
+            return
+
+        # --- Publish Data ---
 
         # Publish the Path message immediately after loading and converting
         self.publish_path_once()
 
-        # Publish the static transform after the map data is ready
+        # Publish the static transform for 'field_frame'
         self.publish_static_transform()
 
         self.get_logger().info("Map published once as Path. Static transform published. Node will now spin indefinitely.")
 
-    def load_map_from_yaml(self):
-        map_file_path = self.get_parameter('map_file_path').get_parameter_value().string_value
-        self.get_logger().info(f"Attempting to load map from: {map_file_path}")
-
-        if not os.path.exists(map_file_path):
-            self.get_logger().error(f"Map file not found at: {map_file_path}")
-            return None
-
-        try:
-            with open(map_file_path, 'r') as file:
-                data = yaml.safe_load(file)
-                if 'field_boundary' in data and isinstance(data['field_boundary'], list):
-                    return data.get('field_boundary')
-                else:
-                    self.get_logger().error("YAML file does not contain a 'field_boundary' list under the 'field_boundary' key.")
-                    return None
-        except yaml.YAMLError as e:
-            self.get_logger().error(f"Error parsing YAML file: {e}")
-            return None
-        except Exception as e:
-            self.get_logger().error(f"An unexpected error occurred while loading map: {e}")
-            return None
-
-    def convert_to_utm_poses(self):
-        if not self.polygon_data:
-            return []
-
-        converted_poses = []
-        # Calculate a local origin for the 'field_frame' based on the first point's UTM coordinates
-        # This makes the path appear around (0,0) in RViz's 'field_frame'
-        # while 'field_frame' itself is transformed to its true UTM location in 'map' frame.
-        first_lat = float(self.polygon_data[0]['latitude'])
-        first_lon = float(self.polygon_data[0]['longitude'])
-        self.origin_utm_x, self.origin_utm_y = self.transformer.transform(first_lat, first_lon)
-        self.get_logger().info(f"UTM Origin for 'field_frame' set to: ({self.origin_utm_x}, {self.origin_utm_y})")
-
-
+    def _create_path_poses(self, xy_meters: List[Tuple[float, float]]) -> List[PoseStamped]:
+        """
+        Helper to create a list of PoseStamped messages from relative X, Y meter coordinates.
+        These poses are in the 'field_frame', which will be offset by the map's UTM origin.
+        """
+        poses = []
         # Create an identity quaternion for the poses (no rotation)
-        # tf_transformations.quaternion_from_euler(roll, pitch, yaw)
-        # (0,0,0) means no rotation.
         q = quaternion_from_euler(0, 0, 0)
         identity_orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
 
+        current_stamp = self.get_clock().now().to_msg() # Use a single stamp for all poses in this path
 
-        for point_data in self.polygon_data:
-            lat = float(point_data['latitude'])
-            lon = float(point_data['longitude'])
-
-            utm_x, utm_y = self.transformer.transform(lat, lon)
-
+        for x_m, y_m in xy_meters:
             pose_stamped = PoseStamped()
-            pose_stamped.header.stamp = self.get_clock().now().to_msg()
+            pose_stamped.header.stamp = current_stamp
             pose_stamped.header.frame_id = 'field_frame' # Poses are relative to 'field_frame'
-
-            # Position in meters, relative to the chosen origin of 'field_frame'
-            pose_stamped.pose.position.x = utm_x - self.origin_utm_x
-            pose_stamped.pose.position.y = utm_y - self.origin_utm_y
+            pose_stamped.pose.position.x = x_m
+            pose_stamped.pose.position.y = y_m
             pose_stamped.pose.position.z = 0.0 # Assuming 2D path
+            pose_stamped.pose.orientation = identity_orientation
+            poses.append(pose_stamped)
 
-            pose_stamped.pose.orientation = identity_orientation # No rotation
-
-            converted_poses.append(pose_stamped)
-
-        # To close the loop for the path visualization in RViz
-        if converted_poses:
-            first_pose = converted_poses[0]
-            # Create a new PoseStamped with updated stamp if needed, or just append the first one
-            # Appending the first one directly is common for closing a loop.
+        # Close the loop for the path visualization in RViz by adding the first point again
+        if poses:
+            # Create a new PoseStamped to avoid modifying the original first pose object
             closed_loop_pose = PoseStamped()
-            closed_loop_pose.header.stamp = self.get_clock().now().to_msg()
+            closed_loop_pose.header.stamp = current_stamp
             closed_loop_pose.header.frame_id = 'field_frame'
-            closed_loop_pose.pose = first_pose.pose
-            converted_poses.append(closed_loop_pose)
+            closed_loop_pose.pose.position.x = poses[0].pose.position.x
+            closed_loop_pose.pose.position.y = poses[0].pose.position.y
+            closed_loop_pose.pose.position.z = poses[0].pose.position.z
+            closed_loop_pose.pose.orientation = poses[0].pose.orientation
+            poses.append(closed_loop_pose)
 
-
-        return converted_poses
-
+        return poses
 
     def publish_path_once(self):
-        if not self.utm_poses:
-            self.get_logger().warn("No UTM poses to publish for Path.")
+        """Publishes the Path message containing the field boundary."""
+        if not self.path_poses:
+            self.get_logger().warn("No poses to publish for Path. Skipping publication.")
             return
 
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map' # The Path itself is in the 'map' frame
+        path_msg.header.frame_id = 'map' # The Path itself is defined in the 'map' frame
 
-        path_msg.poses = self.utm_poses # Assign the list of PoseStamped messages
+        path_msg.poses = self.path_poses
 
         self.publisher_.publish(path_msg)
         self.get_logger().info(f'Published FieldBoundaryPath with {len(path_msg.poses)} poses (once, latched).')
 
-
     def publish_static_transform(self):
+        """Publishes the static transform from 'map' to 'field_frame'."""
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'
         t.child_frame_id = 'field_frame'
 
-        # This transform places 'field_frame' at the UTM coordinates of your first map point
+        # Set the translation to the absolute UTM coordinates of the bounding box origin.
+        # This places 'field_frame' (and thus the relative Path) at its real-world location in 'map'.
         t.transform.translation.x = self.origin_utm_x
         t.transform.translation.y = self.origin_utm_y
-        t.transform.translation.z = 0.0
+        t.transform.translation.z = 0.0 # Assuming 2D environment
 
         q = quaternion_from_euler(0, 0, 0) # Identity rotation for the frame itself
         t.transform.rotation.x = q[0]
@@ -172,8 +159,7 @@ class MapperNode(Node):
         t.transform.rotation.w = q[3]
 
         self.static_broadcaster.sendTransform(t)
-        self.get_logger().info(f"Published static transform from '{t.header.frame_id}' to '{t.child_frame_id}' at UTM origin.")
-
+        self.get_logger().info(f"Published static transform from '{t.header.frame_id}' to '{t.child_frame_id}' at bounding box UTM origin.")
 
 def main(args=None):
     rclpy.init(args=args)
