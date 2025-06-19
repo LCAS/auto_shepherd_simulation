@@ -74,6 +74,7 @@ class DogController(Node):
         # distance to every vertex
         dists = np.hypot(pts[:,0]-dog_x, pts[:,1]-dog_y)
         self.wp_index = int(dists.argmin())   # closest vertex
+        self.wp_index_init = int(dists.argmin())
         # choose direction (CW vs CCW) by, e.g., lowest steering angle
         self.wp_dir   = +1                    # +1 = CCW, –1 = CW
         self.lap_done = False
@@ -90,7 +91,7 @@ class DogController(Node):
 
         if self.lap_done or self.field_boundary is None:
             return None, None
-        
+
         dog_x, dog_y = (self._planned_dog_xy
                     if self._planned_dog_xy is not None
                     else self.dog_xy)
@@ -105,7 +106,7 @@ class DogController(Node):
             self.wp_index = (self.wp_index + self.wp_dir) % len(self.field_boundary)
 
             # lap-complete test: wrapped around & close to start
-            if self.wp_index == 0 and d < LAP_THRESH:
+            if self.wp_index == self.wp_index_init and d < LAP_THRESH:
                 self.lap_done = True
                 self.get_logger().info("Boundary lap completed!")
                 return dog_x, dog_y
@@ -136,12 +137,12 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        if not self.lap_done:
-            xd_opt, yd_opt = self._boundary_follow_step()
-            print(f"Boundary follow: ({xd_opt:.2f}, {yd_opt:.2f})")
-        else:
-            xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary)
-            print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
+        # if not self.lap_done:
+        #     xd_opt, yd_opt = self._boundary_follow_step()
+        #     print(f"Boundary follow: ({xd_opt:.2f}, {yd_opt:.2f})")
+        # else:
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary)
+        print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
 
         ps = PoseStamped()
         ps.header.stamp = self.get_clock().now().to_msg()

@@ -35,7 +35,7 @@ class RosInterface(Node):
         self.drone_publisher.publish(drone_pose)
 
         # Publish dog pose
-        dog_pose = self.create_pose_stamped(-10.0, 10.0, 0.0)
+        dog_pose = self.create_pose_stamped(-117.0, 50.0, 0.0)
         self.dog_publisher.publish(dog_pose)
 
         # Publish sheep poses as a Path

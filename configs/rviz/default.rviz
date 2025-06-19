@@ -11,6 +11,7 @@ Panels:
         - /Path1/Topic1
         - /Path1/Offset1
         - /Pose1
+        - /Pose2
       Splitter Ratio: 0.5
     Tree Height: 1204
   - Class: rviz_common/Selection
@@ -115,6 +116,26 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /dog/command
       Value: true
+    - Alpha: 1
+      Axes Length: 3
+      Axes Radius: 0.5
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /sheep/goal_pose
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -161,25 +182,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 173.1657257080078
+      Distance: 140.7987060546875
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -44.59016036987305
-        Y: 47.47283935546875
-        Z: 7.680665493011475
+        X: -55.264869689941406
+        Y: 46.4901237487793
+        Z: 9.337041854858398
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.3597965240478516
+      Pitch: 1.0947966575622559
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.8685808181762695
+      Yaw: 5.108584880828857
     Saved: ~
 Window Geometry:
   Displays:
