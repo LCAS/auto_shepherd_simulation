@@ -58,53 +58,53 @@ class Slider:
 class CoordinateTransformer:
     def __init__(self, field_boundary, screen_width, screen_height):
         """Initialize coordinate transformer with field boundary and screen dimensions
-        
+
         Args:
             field_boundary: List of [x, y] points in meters defining the field boundary
             screen_width: Width of the screen in pixels
             screen_height: Height of the screen in pixels
         """
         self.field_boundary = np.array(field_boundary)
-        
+
         # Calculate field bounds in real-world coordinates
         self.field_min_x = np.min(self.field_boundary[:, 0])
         self.field_max_x = np.max(self.field_boundary[:, 0])
         self.field_min_y = np.min(self.field_boundary[:, 1])
         self.field_max_y = np.max(self.field_boundary[:, 1])
-        
+
         # Screen dimensions
         self.screen_width = screen_width
         self.screen_height = screen_height
-        
+
         # Calculate scaling factors
         self.scale_x = screen_width / (self.field_max_x - self.field_min_x)
         self.scale_y = screen_height / (self.field_max_y - self.field_min_y)
-        
+
         # Use the smaller scale to maintain aspect ratio
         self.scale = min(self.scale_x, self.scale_y)
-        
+
         # Calculate offsets to center the field
         self.offset_x = (screen_width - (self.field_max_x - self.field_min_x) * self.scale) / 2
         self.offset_y = (screen_height - (self.field_max_y - self.field_min_y) * self.scale) / 2
-    
+
     def world_to_screen(self, x, y):
         """Convert real-world coordinates to screen coordinates"""
         screen_x = (x - self.field_min_x) * self.scale + self.offset_x
         screen_y = (y - self.field_min_y) * self.scale + self.offset_y
         return screen_x, screen_y
-    
+
     def screen_to_world(self, screen_x, screen_y):
         """Convert screen coordinates to real-world coordinates"""
         x = (screen_x - self.offset_x) / self.scale + self.field_min_x
         y = (screen_y - self.offset_y) / self.scale + self.field_min_y
         return x, y
-    
+
     def is_point_in_field(self, x, y):
         """Check if a point is inside the field boundary using ray casting algorithm"""
         point = np.array([x, y])
         n = len(self.field_boundary)
         inside = False
-        
+
         p1x, p1y = self.field_boundary[0]
         for i in range(n + 1):
             p2x, p2y = self.field_boundary[i % n]
@@ -116,7 +116,7 @@ class CoordinateTransformer:
                         if p1x == p2x or x <= xinters:
                             inside = not inside
             p1x, p1y = p2x, p2y
-            
+
         return inside
 
     def get_closest_boundary_point(self, x, y):
@@ -124,41 +124,41 @@ class CoordinateTransformer:
         point = np.array([x, y])
         min_dist = float('inf')
         closest_point = None
-        
+
         # Check each line segment of the boundary
         for i in range(len(self.field_boundary)):
             p1 = self.field_boundary[i]
             p2 = self.field_boundary[(i + 1) % len(self.field_boundary)]
-            
+
             # Vector from p1 to p2
             line_vec = p2 - p1
             # Vector from p1 to point
             point_vec = point - p1
-            
+
             # Project point_vec onto line_vec
             line_len = np.linalg.norm(line_vec)
             line_unitvec = line_vec / line_len
             projection = np.dot(point_vec, line_unitvec)
-            
+
             # Clamp projection to line segment
             projection = max(0, min(line_len, projection))
-            
+
             # Calculate closest point on line segment
             closest = p1 + projection * line_unitvec
-            
+
             # Calculate distance to closest point
             dist = np.linalg.norm(point - closest)
-            
+
             if dist < min_dist:
                 min_dist = dist
                 closest_point = closest
-        
+
         return closest_point
 
 class Simulation:
     def __init__(self, field_boundary, screen_width=800, screen_height=600, sheep_states=None, sheepdog_state=None):
         """Initialize simulation with field boundary
-        
+
         Args:
             field_boundary: List of [x, y] points in meters defining the field boundary
             screen_width: Width of the screen in pixels
@@ -168,10 +168,10 @@ class Simulation:
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
-        
+
         # Initialize coordinate transformer
         self.coord_transformer = CoordinateTransformer(field_boundary, screen_width, screen_height)
-        
+
         # Create the sheepdog
         if sheepdog_state is None:
             # Place sheepdog at center of field in real-world coordinates
@@ -187,12 +187,12 @@ class Simulation:
             yaw=0,  # Initial yaw
             coord_transformer=self.coord_transformer
         )
-        
+
         # Create a list of sheep
         self.num_sheep = 50 if sheep_states is None else len(sheep_states)
         self.sheep_list = []
         self._initialize_sheep(sheep_states)
-        
+
         # Flocking parameters
         self.alignment_weight = 1.0
         self.cohesion_weight = 0.3
@@ -206,9 +206,11 @@ class Simulation:
             for _ in range(self.num_sheep):
                 while True:
                     # Generate random position in real-world coordinates
-                    x = random.uniform(self.coord_transformer.field_min_x, self.coord_transformer.field_max_x)
-                    y = random.uniform(self.coord_transformer.field_min_y, self.coord_transformer.field_max_y)
-                    
+                    # x = random.uniform(self.coord_transformer.field_min_x, self.coord_transformer.field_max_x)
+                    # y = random.uniform(self.coord_transformer.field_min_y, self.coord_transformer.field_max_y)
+                    x = -35
+                    y = 40
+
                     # Check if position is inside field boundary
                     if self.coord_transformer.is_point_in_field(x, y):
                         position = [x, y]
@@ -234,7 +236,7 @@ class Simulation:
 
     def update(self, dt=0.02, sheepdog_state=None):
         """Update the simulation state
-        
+
         Args:
             dt: Time step in seconds
             sheepdog_state: Optional dictionary with 'position' and 'velocity' keys.
@@ -245,12 +247,12 @@ class Simulation:
         if sheepdog_state is not None:
             if not isinstance(sheepdog_state, dict) or 'position' not in sheepdog_state:
                 raise ValueError("Sheepdog state must be provided as a dictionary with 'position' key")
-            
+
             self.sheepdog.set_position(sheepdog_state['position'][0], sheepdog_state['position'][1])
-            
+
             if 'velocity' in sheepdog_state:
                 self.sheepdog.velocity = sheepdog_state['velocity']
-            
+
 
         # Update each sheep
         for sheep in self.sheep_list:
@@ -267,18 +269,18 @@ class Simulation:
         """Draw the simulation state"""
         # Fill the screen with grass color
         screen.fill(GREEN)
-        
+
         # Draw field boundary
         screen_points = []
         for point in self.coord_transformer.field_boundary:
             screen_x, screen_y = self.coord_transformer.world_to_screen(point[0], point[1])
             screen_points.append((screen_x, screen_y))
         pygame.draw.polygon(screen, BLACK, screen_points, 2)
-        
+
         # Draw each sheep
         for sheep in self.sheep_list:
             sheep.draw(screen)
-        
+
         # Draw the sheepdog
         self.sheepdog.draw(screen)
 
@@ -292,32 +294,32 @@ class Game:
         pygame.display.set_caption("Sheep Simulation")
         self.clock = pygame.time.Clock()
         self.running = True
-        
+
         # Colors
         self.BLACK = (0, 0, 0)
         self.GREEN = (34, 139, 34)  # Grass color
         self.WHITE = (255, 255, 255)
         self.GRAY = (128, 128, 128)
         self.LIGHTGREEN = (40,160,40)
-        
+
         # Load map configuration
         # map_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'configs', 'map', 'map1.yaml')
         map_file = '/home/ros/map/map1.yaml'
         field_boundary = load_map_config(map_file)
-        
+
         # Initialize simulation
         self.simulation = Simulation(field_boundary, width, height)
-        
+
         # Initialize sheepdog controller
         self.sheepdog_controller = SheepDogController(self.simulation.sheepdog, width, height)
-        
+
         # Initialize sliders
         self.sliders = {
             'alignment': Slider(10, height - 100, 200, 20, 0, 10, 3.0, "Alignment"),
             'cohesion': Slider(10, height - 70, 200, 20, 0, 10, 5.0, "Cohesion"),
             'separation': Slider(10, height - 40, 200, 20, 0, 10, 2.5, "Separation")
         }
-        
+
         # Instructions
         self.font = pygame.font.Font(None, 24)
         self.instructions = [
@@ -333,7 +335,7 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     return False
-            
+
             # Handle slider events
             for slider in self.sliders.values():
                 slider.handle_event(event)
@@ -343,18 +345,18 @@ class Game:
         """Update game state"""
         # Get time step in seconds
         dt = self.clock.get_time() / 1000.0  # Convert milliseconds to seconds
-        
+
         # Update simulation
         self.simulation.update(dt)
-        
+
         # Update sheepdog controller
         keys = pygame.key.get_pressed()
         self.sheepdog_controller.update(keys, dt)
-        
+
         # Update sliders
         for slider in self.sliders.values():
             slider.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {'pos': pygame.mouse.get_pos()}))
-        
+
         # Update simulation parameters
         self.simulation.alignment_weight = self.sliders['alignment'].value
         self.simulation.cohesion_weight = self.sliders['cohesion'].value
@@ -405,7 +407,7 @@ def load_map_config(map_file):
     """Load map configuration from YAML file and convert coordinates to meters"""
     with open(map_file, 'r') as f:
         config = yaml.safe_load(f)
-    
+
     # Convert lat/lon to meters (approximate conversion)
     # Using a simple conversion where 1 degree of latitude ≈ 111,320 meters
     # and 1 degree of longitude ≈ 111,320 * cos(latitude) meters
@@ -424,10 +426,10 @@ def load_map_config(map_file):
             x = (lon - ref_lon) * 111320 * np.cos(np.radians(ref_lat))
             y = (lat - ref_lat) * 111320
         boundary_points.append([x, y])
-    
+
     return boundary_points
 
 if __name__ == "__main__":
     # Create and run the game
     game = Game(800, 600)
-    game.run() 
+    game.run()
