@@ -73,24 +73,27 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
 
     db = DBSCAN(eps=10, min_samples=1).fit(points)
     labels = db.labels_
-    furthest_distance, furthest_cluster = -1, -1
+    cluster_distances = []
     print(f"{len(np.unique(labels))} clusters found")
-    for cluster in np.unique(labels):
-        centre_of_cluster = np.mean(points[labels==cluster],axis=0)
-        distance_to_goal = np.linalg.norm(centre_of_cluster-goal_point)
-        if distance_to_goal > furthest_distance:
-            furthest_distance, furthest_cluster = distance_to_goal, cluster
-    points = points[labels==furthest_cluster]
+    if len(np.unique(labels)) != 1:
+        for cluster in np.unique(labels):
+            centre_of_cluster = np.mean(points[labels==cluster],axis=0)
+            distance_to_goal = np.linalg.norm(centre_of_cluster-goal_point)
+            cluster_distances.append([cluster, distance_to_goal])
+        cluster_distances.sort(key=lambda x: x[1])
+        points = points[labels==cluster_distances[-1][0]]
 
     (xmean, ymean), radius_sheep = circle_around_points(points)
-    radius_sheep += .05 # ensure single sheep clusters have a radius
-    
+    radius_sheep = max(radius_sheep, 1) # ensure single sheep clusters have a radius
+
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
     if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 5:
         d = np.linalg.norm(np.asarray([-10, 10]) - np.asarray([xd, yd]))
-        closest_point = (xd + (-10 - xd) * radius_d / d, yd + (10 - yd) * radius_d / d)
-        points = np.array([closest_point])
-        optimal_xd, optimal_yd = closest_point
+        if d < 3: optimal_xd, optimal_yd = xd, yd
+        else:
+            closest_point = (xd + (-10 - xd) * radius_d / d, yd + (10 - yd) * radius_d / d)
+            points = np.array([closest_point])
+            optimal_xd, optimal_yd = closest_point
     elif d > radius_d + radius_sheep:
         print("Moving towards sheep")
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
@@ -128,7 +131,6 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
             if i-last_update > early_exit_threshold: break
-    if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
     return optimal_xd, optimal_yd
 
 def pure_pursuit(dog_xy, target_xy, lookahead=2.0, step=0.5):

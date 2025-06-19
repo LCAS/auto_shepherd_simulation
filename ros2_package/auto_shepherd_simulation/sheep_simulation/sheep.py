@@ -39,7 +39,7 @@ class Sheep:
 
         # Flocking parameters
         self.alignment_weight = 3.0
-        self.cohesion_weight = 5.0
+        self.cohesion_weight = 5.5
         self.separation_weight = 8.0
 
         # Physical properties

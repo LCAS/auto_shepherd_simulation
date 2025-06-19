@@ -198,8 +198,8 @@ class Simulation:
         self.cohesion_weight = 0.3
         self.separation_weight = 6.0
 
-        for i in range(200):
-            self.update(0.05)
+        # for i in range(200):
+        #     self.update(0.05)
 
     def _initialize_sheep(self, sheep_states=None):
         """Initialize sheep with given states or random positions"""
