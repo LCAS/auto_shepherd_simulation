@@ -110,6 +110,46 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
     if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
     return optimal_xd, optimal_yd
 
+def pure_pursuit(dog_xy, target_xy, lookahead=2.0, step=0.5):
+    """
+    Minimal pure-pursuit helper.
+
+    Parameters
+    ----------
+    dog_xy      : (x, y) tuple – current dog position.
+    target_xy   : (x, y) tuple – look-ahead goal on the path.
+    lookahead   : float – distance the controller ‘looks’ ahead (m).
+    step        : float – how far the dog moves this control cycle (m).
+
+    Returns
+    -------
+    x_next, y_next  : the next set-point for the dog (often just published
+                      as a PoseStamped).
+    """
+    xd, yd   = dog_xy
+    xt, yt   = target_xy
+
+    # 1.  distance and heading to the look-ahead point
+    dx, dy   = xt - xd, yt - yd
+    dist     = maths.hypot(dx, dy)
+
+    if dist < 1e-6:        # already there → hold position
+        return xt, yt, None
+
+    # 2.  normalised direction vector
+    ux, uy   = dx / dist, dy / dist
+
+    # 3.  advance by `step` (or full distance if closer)
+    move     = min(step, dist)
+    x_next   = xd + ux * move
+    y_next   = yd + uy * move
+
+    # (optional) diagnostics – could plot candidate points
+    dbg_pts  = np.array([[xt, yt], [x_next, y_next]])
+
+    return x_next, y_next, dbg_pts
+
+
 def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, radius_d=1.5):
     (xmean, ymean), radius_sheep = circle_around_points(np.stack([x, y], axis=1))
 
