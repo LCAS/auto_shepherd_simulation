@@ -35,13 +35,13 @@ class RosInterface(Node):
         self.drone_publisher.publish(drone_pose)
 
         # Publish dog pose
-        dog_pose = self.create_pose_stamped(4.0, 5.0, 0.0)
+        dog_pose = self.create_pose_stamped(-10.0, 10.0, 0.0)
         self.dog_publisher.publish(dog_pose)
 
         # Publish sheep poses as a Path
         sheep_path = Path()
         sheep_path.header = self.create_header()
-        
+
         # Example sheep poses with individual timestamps
         sheep_path.poses = [
             self.create_pose_stamped(6.0, 7.0, 0.0),
@@ -50,7 +50,7 @@ class RosInterface(Node):
         self.sheep_publisher.publish(sheep_path)
 
         # Publish sheep goal pose
-        sheep_goal_pose = self.create_pose_stamped(1.0, 1.0, 0.0)
+        sheep_goal_pose = self.create_pose_stamped(-38.0, 90.0, 0.0)
         self.sheep_goal_publisher.publish(sheep_goal_pose)
 
     def dog_command_callback(self, msg):
@@ -69,4 +69,4 @@ def main(args=None):
     rclpy.shutdown()
 
 if __name__ == '__main__':
-    main() 
+    main()

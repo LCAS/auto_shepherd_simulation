@@ -32,6 +32,30 @@ class DogController(Node):
         # control timer ----------------------------------------------------
         self.timer = self.create_timer(0.1, self._control_step)
 
+        yaml_map_file_path = "/home/ros/map/map1.yaml"
+        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
+        try:
+            field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
+            print(f"Successfully loaded {len(field_coords_latlon)} coordinates from YAML.")
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Failed to load coordinates from YAML: {e}")
+            print("Please ensure the file path is correct and the YAML format matches 'field_boundary: - latitude: X - longitude: Y'.")
+            print("Exiting example.")
+            exit(1) # Exit if cannot load map data
+
+
+        # Create Map Bounding Box & Convert All Coords
+        try:
+            map_converter = MapConverter(field_coords_latlon)
+            map_data = map_converter.get_map_data()
+
+            self.field_boundary = map_data['map_coords_xy_meters']
+
+        except ValueError as e:
+            print(f"Error during map conversion: {e}")
+            map_converter = None # Ensure map_converter is not set if initialization failed
+
+
     # ------------ message callbacks -------------------------------------
     def _dog_cb(self, msg: PoseStamped):
         self.dog_xy = (msg.pose.position.x, msg.pose.position.y)
@@ -64,7 +88,7 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc)
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary)
 
         ps = PoseStamped()
         ps.header.stamp = self.get_clock().now().to_msg()
@@ -78,7 +102,7 @@ class DogController(Node):
 
         # plot
         # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt)
-        
+
 
 # ----------------------------------------------------------------------
 # entry-point -----------------------------------------------------------

@@ -67,18 +67,18 @@ class DogControlSimulator(Node):
 
         self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None)
         self.dt = 0.05
-        self.sim_step_timer = self.create_timer(0.05, self.run_sim_step, callback_group=RCG())
+        self.sim_step_timer = self.create_timer(self.dt, self.run_sim_step, callback_group=RCG())
 
         print('Dog Control Simulator Initialised')
 
-        
+
 
     def _dog_command_cb(self, msg):
         """Callback for dog command messages"""
-        
+
         self.dog_command = {
             'position': [msg.pose.position.x, msg.pose.position.y],
-            'orientation': [msg.pose.orientation.x, msg.pose.orientation.y, 
+            'orientation': [msg.pose.orientation.x, msg.pose.orientation.y,
                           msg.pose.orientation.z, msg.pose.orientation.w],
             'velocity': [0,0]
         }
@@ -141,7 +141,7 @@ class DogControlSimulator(Node):
     def publish_simulation_state(self, state):
         """Convert simulation state to MarkerArray and publish for RViz visualization"""
         marker_array = MarkerArray()
-        
+
         # Create markers for sheep
         for i, sheep_state in enumerate(state['sheep']):
             # Create sheep marker
@@ -152,18 +152,18 @@ class DogControlSimulator(Node):
             sheep_marker.id = i
             sheep_marker.type = Marker.CYLINDER
             sheep_marker.action = Marker.ADD
-            
+
             # Set sheep position
             sheep_marker.pose.position.x = sheep_state['position'][0]
             sheep_marker.pose.position.y = sheep_state['position'][1]
             sheep_marker.pose.position.z = 0.0
-            
+
             # Set sheep size
-            sheep_marker.scale = Vector3(x=5.0 , y=5.0, z=1.0)
-            
+            sheep_marker.scale = Vector3(x=1.0 , y=1.0, z=1.0)
+
             # Set sheep color (white)
             sheep_marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
-            
+
             # Add velocity arrow
             if 'velocity' in sheep_state:
                 vel_marker = Marker()
@@ -172,24 +172,24 @@ class DogControlSimulator(Node):
                 vel_marker.id = i
                 vel_marker.type = Marker.ARROW
                 vel_marker.action = Marker.ADD
-                
+
                 # Set arrow points
-                start_point = Point(x=sheep_state['position'][0], 
-                                  y=sheep_state['position'][1], 
+                start_point = Point(x=sheep_state['position'][0],
+                                  y=sheep_state['position'][1],
                                   z=0.0)
                 end_point = Point(x=sheep_state['position'][0] + sheep_state['velocity'][0],
                                 y=sheep_state['position'][1] + sheep_state['velocity'][1],
                                 z=0.0)
                 vel_marker.points = [start_point, end_point]
-                
+
                 # Set arrow properties
                 vel_marker.scale = Vector3(x=1.0, y=1.0, z=0.5)
                 vel_marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
-                
+
                 marker_array.markers.append(vel_marker)
-            
+
             marker_array.markers.append(sheep_marker)
-        
+
         # Create marker for sheepdog
         dog_state = state['sheepdog']
         dog_marker = Marker()
@@ -199,18 +199,18 @@ class DogControlSimulator(Node):
         dog_marker.id = 0
         dog_marker.type = Marker.CYLINDER
         dog_marker.action = Marker.ADD
-        
+
         # Set dog position
         dog_marker.pose.position.x = dog_state['position'][0]
         dog_marker.pose.position.y = dog_state['position'][1]
         dog_marker.pose.position.z = 0.0
-        
+
         # Set dog size (slightly larger than sheep)
-        dog_marker.scale = Vector3(x=5.0, y=5.0 , z=2.5)
-        
+        dog_marker.scale = Vector3(x=1.0, y=1.0 , z=1.0)
+
         # Set dog color (brown)
         dog_marker.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)
-        
+
         # Add velocity arrow for dog
         if 'velocity' in dog_state:
             vel_marker = Marker()
@@ -219,24 +219,24 @@ class DogControlSimulator(Node):
             vel_marker.id = 0
             vel_marker.type = Marker.ARROW
             vel_marker.action = Marker.ADD
-            
+
             # Set arrow points
-            start_point = Point(x=dog_state['position'][0], 
-                              y=dog_state['position'][1], 
+            start_point = Point(x=dog_state['position'][0],
+                              y=dog_state['position'][1],
                               z=0.0)
             end_point = Point(x=dog_state['position'][0] + dog_state['velocity'][0],
                             y=dog_state['position'][1] + dog_state['velocity'][1],
                             z=0.0)
             vel_marker.points = [start_point, end_point]
-            
+
             # Set arrow properties
             vel_marker.scale = Vector3(x=0.1, y=0.2, z=0.1)
             vel_marker.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)
-            
+
             marker_array.markers.append(vel_marker)
-        
+
         marker_array.markers.append(dog_marker)
-        
+
         # Publish the markers
         self.marker_pub.publish(marker_array)
 
@@ -263,11 +263,11 @@ class DogControlSimulator(Node):
     def run_sim_step(self, timestep=None):
         if self.simulation is None:          # wait until we have initialised it
             return
-                
+
         # Execute simulation step
         self.simulation.update(self.dt, self.dog_command)
         sheep_estimates = self.simulation.get_state()
-        
+
         # Publish visualization markers
         self.publish_simulation_state(sheep_estimates)
         # Publish sheep path

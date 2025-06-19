@@ -40,9 +40,9 @@ def angle(xbase, ybase, xnew, ynew):
 def cost(x, y, xd, yd, xc, yc, simulation):
     # get the new direction of the flock given the current sheep positions and future dog position
     # xvel, yvel = get_direction(x, y, xd, yd)
-    # position and velocity, 
+    # position and velocity,
     sheepdog_state = {'position': [xd, yd], 'velocity': [0, 0]}
-    simulation.update(sheepdog_state)
+    simulation.update(0.05, sheepdog_state)
     new_state = simulation.get_state()
     x_new = []
     y_new = []
@@ -59,8 +59,8 @@ def cost(x, y, xd, yd, xc, yc, simulation):
 
 
 
-def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
-                           radius_d=1.5, n_candidates=15, early_exit_threshold=5,
+def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
+                           radius_d=1.4, n_candidates=15, early_exit_threshold=5,
                            default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
     (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
@@ -68,15 +68,18 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
 
     if d > radius_d + radius_sheep:
+        print("Moving towards sheep")
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
     elif d < abs(radius_d - radius_sheep):
+        print("Moving away from sheep")
         d = np.linalg.norm(default_goto - np.asarray([xd, yd]))
         closest_point = (xd + (default_goto[0] - xd) * radius_d / d, yd + (default_goto[1] - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
     else:
+        print("Herding sheep")
         # get points around sheep
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
         angle_start = np.arctan2(yd - ymean, xd - xmean)
@@ -87,7 +90,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         # set up simulation
         sheep_states = [{'position': [x, y], 'velocity': [0, 0]} for x, y in zip(x, y)]
         sheepdog_state = {'position': [xd, yd], 'velocity': [0, 0]}
-        simulation = Simulation(800, 600, sheep_states=sheep_states, sheepdog_state=sheepdog_state)
+        simulation = Simulation(field_boundary, 800, 600, sheep_states=sheep_states, sheepdog_state=sheepdog_state)
 
         # optimise new dog position
         last_update = 0
