@@ -24,6 +24,7 @@ class DogController(Node):
 
         # state caches ----------------------------------------------------
         self.dog_xy   = None              # (x, y)
+        self._planned_dog_xy = None       # (x, y) of the last planned dog position
         self.sheep_xy = None              # Nx2 array
         self.goal_xy  = None              # (x, y)
 
@@ -45,17 +46,24 @@ class DogController(Node):
     def _control_step(self):
         print("_control_step")
 
-        if self.dog_xy is None or self.sheep_xy is None or self.goal_xy is None:
-            print(self.dog_xy)
-            print(self.sheep_xy)
-            print(self.goal_xy)
-            return  # wait for all data
+        # make sure we have the three inputs we need
+        if self.sheep_xy is None or self.goal_xy is None:
+            return
+        if self.dog_xy is None and self._planned_dog_xy is None:
+            return   # still waiting for the very first dog pose
+
+        # ---------------------------------------------
+        # choose the starting point for optimisation
+        # ---------------------------------------------
+        if self._planned_dog_xy is None:
+            xd_start, yd_start = self.dog_xy          # FIRST call → live pose
+        else:
+            xd_start, yd_start = self._planned_dog_xy # LATER calls → last plan
 
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
-        xd, yd = self.dog_xy
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt, points = find_best_dog_position(xs, ys, xd, yd, xc, yc)
+        xd_opt, yd_opt, points = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc)
 
         ps = PoseStamped()
         ps.header.stamp = self.get_clock().now().to_msg()
@@ -64,6 +72,8 @@ class DogController(Node):
         ps.pose.orientation = Quaternion(w=1.0)  # identity; adjust if needed
         self.cmd_pub.publish(ps)
         self.get_logger().debug(f'Cmd ({xd_opt:.2f}, {yd_opt:.2f})')
+
+        self._planned_dog_xy = (xd_opt, yd_opt)
 
         # plot
         # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
