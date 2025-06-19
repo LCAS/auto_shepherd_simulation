@@ -111,7 +111,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
     return optimal_xd, optimal_yd
 
 def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, radius_d=1.5):
-    (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
+    (xmean, ymean), radius_sheep = circle_around_points(np.stack([x, y], axis=1))
 
     fig, ax = plt.subplots()
     fig.set_figheight(6)
