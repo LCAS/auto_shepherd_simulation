@@ -10,6 +10,7 @@ from std_msgs.msg import ColorRGBA
 from rclpy.callback_groups import ReentrantCallbackGroup as RCG
 
 from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation.utils.geo_converter import MapConverter, load_coords_from_yaml
 
 class DogControlSimulator(Node):
     def __init__(self):
@@ -39,9 +40,37 @@ class DogControlSimulator(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/simulation_markers', qos_profile)
         self.sheep_sim_pub = self.create_publisher(Path, '/sheep/poses_sim', qos_profile)
 
-        self.sim_step_timer = self.create_timer(0.1, self.run_sim_step, callback_group=RCG())
 
-        # print('Dog Control Simulator Initialised')
+        yaml_map_file_path = "/home/ros/map/map1.yaml"
+        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
+        try:
+            field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
+            print(f"Successfully loaded {len(field_coords_latlon)} coordinates from YAML.")
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Failed to load coordinates from YAML: {e}")
+            print("Please ensure the file path is correct and the YAML format matches 'field_boundary: - latitude: X - longitude: Y'.")
+            print("Exiting example.")
+            exit(1) # Exit if cannot load map data
+
+
+        # Create Map Bounding Box & Convert All Coords
+        try:
+            map_converter = MapConverter(field_coords_latlon)
+            map_data = map_converter.get_map_data()
+
+            self.field_boundary = map_data['map_coords_xy_meters']
+
+        except ValueError as e:
+            print(f"Error during map conversion: {e}")
+            map_converter = None # Ensure map_converter is not set if initialization failed
+
+
+        self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None)
+        self.dt = 0.05
+        self.sim_step_timer = self.create_timer(0.05, self.run_sim_step, callback_group=RCG())
+
+        print('Dog Control Simulator Initialised')
+
         
 
     def _dog_command_cb(self, msg):
@@ -101,6 +130,7 @@ class DogControlSimulator(Node):
             # flatten current sheep snapshot into list of dicts
             sheep_states = [hist[-1] for hist in self.sheep_poses.values()]
             self.simulation = Simulation(
+                self.field_boundary,
                 800, 600,
                 sheep_states=sheep_states,
                 sheepdog_state=self.dog_state
@@ -235,8 +265,9 @@ class DogControlSimulator(Node):
             return
                 
         # Execute simulation step
-        self.simulation.update(self.dog_command)
+        self.simulation.update(self.dt, self.dog_command)
         sheep_estimates = self.simulation.get_state()
+        
         # Publish visualization markers
         self.publish_simulation_state(sheep_estimates)
         # Publish sheep path
