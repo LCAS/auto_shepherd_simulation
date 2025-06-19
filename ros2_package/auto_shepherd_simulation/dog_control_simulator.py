@@ -58,16 +58,14 @@ class DogControlSimulator(Node):
             map_converter = MapConverter(field_coords_latlon)
             map_data = map_converter.get_map_data()
 
-            field_boundary = map_data['map_coords_xy_meters']
+            self.field_boundary = map_data['map_coords_xy_meters']
 
         except ValueError as e:
             print(f"Error during map conversion: {e}")
             map_converter = None # Ensure map_converter is not set if initialization failed
 
 
-        map_converter = MapConverter
-
-        self.simulation = Simulation(field_boundary, 800, 600, sheep_states=None, sheepdog_state=None)
+        self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None)
         self.dt = 0.05
         self.sim_step_timer = self.create_timer(0.05, self.run_sim_step, callback_group=RCG())
 
@@ -132,6 +130,7 @@ class DogControlSimulator(Node):
             # flatten current sheep snapshot into list of dicts
             sheep_states = [hist[-1] for hist in self.sheep_poses.values()]
             self.simulation = Simulation(
+                self.field_boundary,
                 800, 600,
                 sheep_states=sheep_states,
                 sheepdog_state=self.dog_state
