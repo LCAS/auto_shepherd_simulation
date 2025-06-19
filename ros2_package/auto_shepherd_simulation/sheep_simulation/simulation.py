@@ -231,12 +231,25 @@ class Simulation:
                     coord_transformer=self.coord_transformer
                 ))
 
-    def update(self, dt):
+    def update(self, dt=0.02, sheepdog_state=None):
         """Update the simulation state
         
         Args:
             dt: Time step in seconds
+            sheepdog_state: Optional dictionary with 'position' and 'velocity' keys.
+                          If None, the sheepdog's current state is maintained.
         """
+
+        # Update sheepdog state if provided
+        if sheepdog_state is not None:
+            if not isinstance(sheepdog_state, dict) or 'position' not in sheepdog_state:
+                raise ValueError("Sheepdog state must be provided as a dictionary with 'position' key")
+            self.sheepdog.x = sheepdog_state['position'][0]
+            self.sheepdog.y = sheepdog_state['position'][1]
+            if 'velocity' in sheepdog_state:
+                self.sheepdog.velocity = sheepdog_state['velocity']
+            self.sheepdog.set_screen_bounds(self.width, self.height)
+
         # Update each sheep
         for sheep in self.sheep_list:
             sheep.update(dt, self.sheep_list, self.sheepdog)
