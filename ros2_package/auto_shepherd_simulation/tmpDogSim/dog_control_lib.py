@@ -67,10 +67,14 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
                            default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
     (xmean, ymean), radius_sheep = circle_around_points(np.stack([x, y], axis=1))
-    radius_sheep += .5
+    #radius_sheep += .5
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
-
-    if d > radius_d + radius_sheep:
+    if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 1:
+        d = np.linalg.norm(np.asarray([-10, 10]) - np.asarray([xd, yd]))
+        closest_point = (xd + (-10 - xd) * radius_d / d, yd + (10 - yd) * radius_d / d)
+        points = np.array([closest_point])
+        optimal_xd, optimal_yd = closest_point
+    elif d > radius_d + radius_sheep:
         print("Moving towards sheep")
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
