@@ -17,8 +17,10 @@ class DogControlSimulator(Node):
 
         # Default the storage points for the animal data
         self.sheep_poses = {}    # {sheep_name: [dict, dict, ...]}
-        self.dog_poses   = {}    # {timestep: {dog_name: PoseStamped}}
+        # self.dog_poses   = {}    # {timestep: {dog_name: PoseStamped}}
+        self.dog_state   = None
         self.dog_command = None  # Store the latest dog command
+        self.simulation  = None  # build later when we get data
 
         # Create QoS profile
         qos_profile = QoSProfile(
@@ -28,7 +30,7 @@ class DogControlSimulator(Node):
         )
 
         # Subscribe to input data
-        self.create_subscription(Path, '/dog/pose', self._dog_cb, qos_profile)
+        self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, qos_profile)
         self.create_subscription(Path, '/sheep/poses', self._sheep_cb, qos_profile)
         self.create_subscription(PoseStamped, '/dog/command', self._dog_command_cb, qos_profile, callback_group=RCG())
 
@@ -37,12 +39,9 @@ class DogControlSimulator(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/simulation_markers', qos_profile)
         self.sheep_sim_pub = self.create_publisher(Path, '/sheep/poses_sim', qos_profile)
 
-        self.simulation = Simulation(800, 600, sheep_states=None, sheepdog_state=None)
-
         self.sim_step_timer = self.create_timer(0.1, self.run_sim_step, callback_group=RCG())
 
-        print('Dog Control Simulator Initialised')
-
+        # print('Dog Control Simulator Initialised')
         
 
     def _dog_command_cb(self, msg):
@@ -57,15 +56,20 @@ class DogControlSimulator(Node):
         self.get_logger().info(f'Received new dog command: {self.dog_command}')
 
     def _dog_cb(self, msg):
-        timestep = msg.header.secs
-        dog_name = msg.header.frame_id or 'dog'
+        # timestep = msg.header.secs
+        # dog_name = msg.header.frame_id or 'dog'
 
         # Initialise storage
-        if timestep not in self.dog_poses:
-            self.dog_poses[timestep] = dict()
+        # if timestep not in self.dog_poses:
+        #     self.dog_poses[timestep] = dict()
 
         # Save dog position at timestep
-        self.dog_poses[timestep][dog_name] = msg
+        # self.dog_poses[timestep][dog_name] = msg
+
+        self.dog_state = {
+            'position': [msg.pose.position.x, msg.pose.position.y],
+            'velocity': [0.0, 0.0]          # you can compute real velocity later
+        }
 
     def _sheep_cb(self, msg):
         # Get current timestep
@@ -90,6 +94,19 @@ class DogControlSimulator(Node):
                 current['velocity'] = [pos.x - px, pos.y - py]
 
             self.sheep_poses[name].append(current)
+        print("sheep poses ready")
+        print(self.simulation, self.dog_state)
+        # ------------- create Simulation once -----------------------------
+        if self.simulation is None and self.dog_state is not None:
+            # flatten current sheep snapshot into list of dicts
+            sheep_states = [hist[-1] for hist in self.sheep_poses.values()]
+            self.simulation = Simulation(
+                800, 600,
+                sheep_states=sheep_states,
+                sheepdog_state=self.dog_state
+            )
+            self.get_logger().info('Simulation initialised with '
+                                f'{len(sheep_states)} sheep.')
 
     def publish_simulation_state(self, state):
         """Convert simulation state to MarkerArray and publish for RViz visualization"""
@@ -214,10 +231,10 @@ class DogControlSimulator(Node):
 
 
     def run_sim_step(self, timestep=None):
-        
+        if self.simulation is None:          # wait until we have initialised it
+            return
                 
         # Execute simulation step
-
         self.simulation.update(self.dog_command)
         sheep_estimates = self.simulation.get_state()
         # Publish visualization markers

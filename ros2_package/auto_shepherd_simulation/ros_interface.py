@@ -13,7 +13,7 @@ class RosInterface(Node):
         self.dog_publisher = self.create_publisher(PoseStamped, '/dog/pose', 10)
         self.sheep_publisher = self.create_publisher(Path, '/sheep/poses', 10)
         self.sheep_goal_publisher = self.create_publisher(PoseStamped, '/sheep/goal_pose', 10)
-        self.dog_command_subscription = self.create_subscription(Float64MultiArray, '/dog/command', self.dog_command_callback, 10)
+        self.dog_command_subscription = self.create_subscription(PoseStamped, '/dog/command', self.dog_command_callback, 10)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
     def create_header(self):
@@ -54,13 +54,12 @@ class RosInterface(Node):
         self.sheep_goal_publisher.publish(sheep_goal_pose)
 
     def dog_command_callback(self, msg):
-        # Handle incoming dog command
-        if len(msg.data) >= 2:
-            target_x = msg.data[0]
-            target_y = msg.data[1]
-            self.get_logger().info(f'Received dog command: Move to ({target_x}, {target_y})')
-        else:
-            self.get_logger().warn('Received invalid dog command format')
+        target_x = msg.pose.position.x
+        target_y = msg.pose.position.y
+        # orientation is already in quaternion form if you need it
+        self.get_logger().info(
+            f"Received dog command: Move to ({target_x:.2f}, {target_y:.2f})"
+        )
 
 def main(args=None):
     rclpy.init(args=args)
