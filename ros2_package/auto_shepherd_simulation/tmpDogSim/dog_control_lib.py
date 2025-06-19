@@ -56,17 +56,22 @@ def cost(x, y, xd, yd, xc, yc, simulation):
 
 
 def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
-                           radius_d=1.5, n_candidates=30, early_exit_threshold=10):
+                           radius_d=1.5, n_candidates=15, early_exit_threshold=5,
+                           default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
     (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
     radius_sheep += .5
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
 
-    if d > radius_d + radius_sheep or d < abs(radius_d - radius_sheep):
+    if d > radius_d + radius_sheep:
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
-        if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
+    elif d < abs(radius_d - radius_sheep):
+        d = np.linalg.norm(default_goto - np.asarray([xd, yd]))
+        closest_point = (xd + (default_goto[0] - xd) * radius_d / d, yd + (default_goto[1] - yd) * radius_d / d)
+        points = np.array([closest_point])
+        optimal_xd, optimal_yd = closest_point
     else:
         # get points around sheep
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
@@ -92,6 +97,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
             if i-last_update > early_exit_threshold: break
+    if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
     return optimal_xd, optimal_yd
 
 def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, radius_d=1.5):
