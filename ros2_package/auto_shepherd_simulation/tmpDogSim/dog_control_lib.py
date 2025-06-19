@@ -61,15 +61,29 @@ def cost(x, y, xd, yd, xc, yc, simulation):
     return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
 
 
-
+from sklearn.cluster import DBSCAN
 def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
                            radius_d=1.4, n_candidates=15, early_exit_threshold=5,
                            default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
-    (xmean, ymean), radius_sheep = circle_around_points(np.stack([x, y], axis=1))
+
+    points = np.stack([x, y], axis=1)
+
+    db = DBSCAN(eps=10, min_samples=1).fit(points)
+    labels = db.labels_
+    furthest_distance, furthest_cluster = -1, -1
+    for cluster in np.unique(labels):
+        centre_of_cluster = np.mean(points[labels==cluster],axis=0)
+        distance_to_goal = np.linalg.norm(centre_of_cluster-np.array([xc,yc]))
+        if distance_to_goal > furthest_distance:
+            furthest_distance = distance_to_goal
+            furthest_cluster = cluster
+    points = points[labels==furthest_cluster]
+
+    (xmean, ymean), radius_sheep = circle_around_points(points)
     #radius_sheep += .5
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
-    if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 1:
+    if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 10:
         d = np.linalg.norm(np.asarray([-10, 10]) - np.asarray([xd, yd]))
         closest_point = (xd + (-10 - xd) * radius_d / d, yd + (10 - yd) * radius_d / d)
         points = np.array([closest_point])
