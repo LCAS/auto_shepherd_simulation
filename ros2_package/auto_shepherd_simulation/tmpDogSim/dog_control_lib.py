@@ -66,6 +66,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
+        if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
     else:
         # get points around sheep
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
