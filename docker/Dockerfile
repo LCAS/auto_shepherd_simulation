@@ -146,6 +146,15 @@ RUN echo '[ -f $HOME/bash_scripts/bashrc_extensions.sh ] && \
     source $HOME/bash_scripts/bashrc_extensions.sh' \
     >> /home/${USERNAME}/.bashrc
 
+RUN echo "function s(){  tmule -c ~/bash_scripts/launcher.yaml -W 3 launch ; }" \
+    >> /home/ros/.bashrc
+
+RUN echo "function t(){  tmule -c ~/bash_scripts/launcher.yaml terminate ; }" \
+    >> /home/ros/.bashrc
+
+RUN echo "function r(){  tmule -c ~/bash_scripts/launcher.yaml -W 3 relaunch ; }" \
+    >> /home/ros/.bashrc
+
 # ──────────────────────────────
 # 9. Default shell
 # ──────────────────────────────

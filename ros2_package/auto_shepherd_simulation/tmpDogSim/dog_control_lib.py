@@ -7,7 +7,11 @@ import numpy as np
 from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
 from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
 
-mc = MapConverter(load_coords_from_yaml("../configs/map/map1.yaml"))
+try:
+    mc = MapConverter(load_coords_from_yaml("/home/ros/map/map1.yaml"))
+except:
+    mc = MapConverter(load_coords_from_yaml("../configs/map/map1.yaml"))
+
 map_polygon = Path(np.array(mc.map_coords_xy_meters))
 #check if points are valid using `map_polygon.contains_point(point)`
 

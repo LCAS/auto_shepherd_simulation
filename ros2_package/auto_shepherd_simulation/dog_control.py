@@ -5,7 +5,8 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Float64MultiArray
 import numpy as np
 import math
-from tmpDogSim.dog_control_lib import find_best_dog_position, plot_current_state
+from auto_shepherd_simulation.tmpDogSim.dog_control_lib import find_best_dog_position, plot_current_state
+from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 class DogController(Node):
     def __init__(self):

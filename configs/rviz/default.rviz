@@ -10,6 +10,7 @@ Panels:
         - /Path1
         - /Path1/Topic1
         - /Path1/Offset1
+        - /Pose1
       Splitter Ratio: 0.5
     Tree Height: 1204
   - Class: rviz_common/Selection
@@ -94,6 +95,26 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /simulation_markers
       Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/Pose
+      Color: 0; 25; 255
+      Enabled: true
+      Head Length: 1
+      Head Radius: 1
+      Name: Pose
+      Shaft Length: 5
+      Shaft Radius: 0.5
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /dog/command
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -140,16 +161,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 260.7147521972656
+      Distance: 173.1657257080078
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 43.791133880615234
-        Y: -48.998191833496094
-        Z: -15.675467491149902
+        X: -44.59016036987305
+        Y: 47.47283935546875
+        Z: 7.680665493011475
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
