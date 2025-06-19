@@ -41,7 +41,7 @@ def normalise_velocities(*values):
 def angle(xbase, ybase, xnew, ynew):
     return maths.acos((xbase*xnew + ybase*ynew)/(maths.sqrt(xbase**2+ybase**2)*maths.sqrt(xnew**2+ynew**2)))
 
-def cost(x, y, xd, yd, xc, yc, simulation):
+def cost(x, y, xd, yd, xc, yc, simulation, distance_weight = 1):
     # get the new direction of the flock given the current sheep positions and future dog position
     # xvel, yvel = get_direction(x, y, xd, yd)
     # position and velocity,
@@ -59,7 +59,8 @@ def cost(x, y, xd, yd, xc, yc, simulation):
     xmean, ymean = np.mean(x), np.mean(y)
     xveldesired, yveldesired = xc - xmean, yc - ymean
     xveldesired, yveldesired = normalise_velocities(xveldesired, yveldesired)
-    return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
+    return angle(xvel, yvel, xveldesired, yveldesired) - distance_weight * np.linalg.norm(np.array([xd,yd] - np.array([xc,yc])))
+    #return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
 
 
 def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
@@ -82,7 +83,8 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
     points = points[labels==furthest_cluster]
 
     (xmean, ymean), radius_sheep = circle_around_points(points)
-    #radius_sheep += .5
+    radius_sheep += .05 # ensure single sheep clusters have a radius
+    
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
     if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 5:
         d = np.linalg.norm(np.asarray([-10, 10]) - np.asarray([xd, yd]))
