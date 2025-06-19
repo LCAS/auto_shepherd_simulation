@@ -2,8 +2,14 @@
 import math as maths
 import cv2
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
 import numpy as np
 from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
+
+mc = MapConverter(load_coords_from_yaml("../configs/map/map1.yaml"))
+map_polygon = Path(np.array(mc.map_coords_xy_meters))
+#check if points are valid using `map_polygon.contains_point(point)`
 
 def smallest_enclosing_circle(points):
     center = np.mean(points, axis=0)
@@ -77,6 +83,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         last_update = 0
         optimal_xd, optimal_yd, optimal_cost = xd, yd, cost(x, y, xd, yd, xc, yc, simulation)
         for i, (new_xd, new_yd) in enumerate(points):
+            if not map_polygon.contains_point((new_xd, new_yd)): continue
             new_cost = cost(x, y, new_xd, new_yd, xc, yc, simulation)
             if new_cost < optimal_cost:
                 optimal_cost = new_cost
