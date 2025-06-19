@@ -63,7 +63,7 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt, points = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc)
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc)
 
         ps = PoseStamped()
         ps.header.stamp = self.get_clock().now().to_msg()
@@ -76,7 +76,7 @@ class DogController(Node):
         self._planned_dog_xy = (xd_opt, yd_opt)
 
         # plot
-        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt, points)
+        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt)
         
 
 # ----------------------------------------------------------------------
