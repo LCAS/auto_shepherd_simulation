@@ -4,6 +4,8 @@
 COMPOSE_FILE="docker-compose.yml"
 SERVICE_NAME="auto_shepherd_simulation_ros2_humble"
 
+xhost +local:docker
+
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     HOST_DISPLAY_VAR="$DISPLAY"
 elif [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "msys"* || "$OSTYPE" == "win32"* ]]; then
@@ -30,7 +32,9 @@ echo "Starting Docker Compose service '${SERVICE_NAME}' in interactive mode..."
 docker compose -f "${COMPOSE_FILE}" run \
     -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
     -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
+    -e QT_X11_NO_MITSHM=1 \
     "${DOCKER_RUN_ARGS[@]}" \
-    "${SERVICE_NAME}" bash
+    "${SERVICE_NAME}" \
+    bash
 
 echo "Docker container session ended."

@@ -3,6 +3,7 @@ import math as maths
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
 
 def smallest_enclosing_circle(points):
     center = np.mean(points, axis=0)
@@ -26,9 +27,20 @@ def normalise_velocities(*values):
 def angle(xbase, ybase, xnew, ynew):
     return maths.acos((xbase*xnew + ybase*ynew)/(maths.sqrt(xbase**2+ybase**2)*maths.sqrt(xnew**2+ynew**2)))
 
-def cost(x, y, xd, yd, xc, yc):
-    # get the new direction of the flock
-    xvel, yvel = get_direction(x, y, xd, yd)
+def cost(x, y, xd, yd, xc, yc, simulation):
+    # get the new direction of the flock given the current sheep positions and future dog position
+    # xvel, yvel = get_direction(x, y, xd, yd)
+    # position and velocity, 
+    sheepdog_state = {'position': [xd, yd], 'velocity': [0, 0]}
+    simulation.update(sheepdog_state)
+    new_state = simulation.get_state()
+    x_new = []
+    y_new = []
+    for i, sheep in enumerate(new_state['sheep']):
+        x_new.append(sheep['position'][0])
+        y_new.append(sheep['position'][1])
+    xvel, yvel = get_direction(np.array(x_new), np.array(y_new), x, y)
+
     # get the angle between that and the desired direction
     xmean, ymean = np.mean(x), np.mean(y)
     xveldesired, yveldesired = xc - xmean, yc - ymean
@@ -36,7 +48,7 @@ def cost(x, y, xd, yd, xc, yc):
     return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
 
 
-# --- keep your maths helpers and find_best_dog_position -----------------
+
 def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
                            radius_d=1.5, n_candidates=30, early_exit_threshold=10):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
@@ -56,11 +68,16 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         random_angles = np.random.uniform(angle_range[0], angle_range[1], n_candidates)
         points = np.asarray([xmean, ymean]) + radius_sheep * np.column_stack([np.cos(random_angles), np.sin(random_angles)])
 
+        # set up simulation
+        sheep_states = [{'position': [x, y], 'velocity': [0, 0]} for x, y in zip(x, y)]
+        sheepdog_state = {'position': [xd, yd], 'velocity': [0, 0]}
+        simulation = Simulation(800, 600, sheep_states=sheep_states, sheepdog_state=sheepdog_state)
+
         # optimise new dog position
         last_update = 0
-        optimal_xd, optimal_yd, optimal_cost = xd, yd, cost(x, y, xd, yd, xc, yc)
+        optimal_xd, optimal_yd, optimal_cost = xd, yd, cost(x, y, xd, yd, xc, yc, simulation)
         for i, (new_xd, new_yd) in enumerate(points):
-            new_cost = cost(x, y, new_xd, new_yd, xc, yc)
+            new_cost = cost(x, y, new_xd, new_yd, xc, yc, simulation)
             if new_cost < optimal_cost:
                 optimal_cost = new_cost
                 optimal_xd, optimal_yd = new_xd, new_yd
