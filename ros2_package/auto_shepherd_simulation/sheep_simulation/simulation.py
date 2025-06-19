@@ -201,6 +201,7 @@ class Simulation:
     def _initialize_sheep(self, sheep_states=None):
         """Initialize sheep with given states or random positions"""
         if sheep_states is None:
+            print('random sheep init')
             # Initialize with random positions within field boundary
             for _ in range(self.num_sheep):
                 while True:
@@ -244,11 +245,12 @@ class Simulation:
         if sheepdog_state is not None:
             if not isinstance(sheepdog_state, dict) or 'position' not in sheepdog_state:
                 raise ValueError("Sheepdog state must be provided as a dictionary with 'position' key")
-            self.sheepdog.x = sheepdog_state['position'][0]
-            self.sheepdog.y = sheepdog_state['position'][1]
+            
+            self.sheepdog.set_position(sheepdog_state['position'][0], sheepdog_state['position'][1])
+            
             if 'velocity' in sheepdog_state:
                 self.sheepdog.velocity = sheepdog_state['velocity']
-            self.sheepdog.set_screen_bounds(self.width, self.height)
+            
 
         # Update each sheep
         for sheep in self.sheep_list:
@@ -299,8 +301,8 @@ class Game:
         self.LIGHTGREEN = (40,160,40)
         
         # Load map configuration
-        map_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
-                               'configs', 'map', 'map1.yaml')
+        # map_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'configs', 'map', 'map1.yaml')
+        map_file = '/home/ros/map/map1.yaml'
         field_boundary = load_map_config(map_file)
         
         # Initialize simulation
