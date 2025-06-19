@@ -4,6 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 import numpy as np
+from sklearn.cluster import DBSCAN
 from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
 from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
 
@@ -61,23 +62,23 @@ def cost(x, y, xd, yd, xc, yc, simulation):
     return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
 
 
-from sklearn.cluster import DBSCAN
 def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
                            radius_d=1.4, n_candidates=15, early_exit_threshold=5,
                            default_goto=np.asarray((0,0))):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
 
     points = np.stack([x, y], axis=1)
+    goal_point = np.array([xc,yc])
 
     db = DBSCAN(eps=10, min_samples=1).fit(points)
     labels = db.labels_
     furthest_distance, furthest_cluster = -1, -1
+    print(f"{len(np.unique(labels))} clusters found")
     for cluster in np.unique(labels):
         centre_of_cluster = np.mean(points[labels==cluster],axis=0)
-        distance_to_goal = np.linalg.norm(centre_of_cluster-np.array([xc,yc]))
+        distance_to_goal = np.linalg.norm(centre_of_cluster-goal_point)
         if distance_to_goal > furthest_distance:
-            furthest_distance = distance_to_goal
-            furthest_cluster = cluster
+            furthest_distance, furthest_cluster = distance_to_goal, cluster
     points = points[labels==furthest_cluster]
 
     (xmean, ymean), radius_sheep = circle_around_points(points)
