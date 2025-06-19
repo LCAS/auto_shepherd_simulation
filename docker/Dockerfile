@@ -119,7 +119,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade \
     pip wheel \
     setuptools==58.2.0 \
     packaging==24.2 \
-    numpy \
+    numpy==1.23.5 \
     scipy \
     matplotlib \
     pyproj \

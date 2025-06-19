@@ -2,8 +2,14 @@
 import math as maths
 import cv2
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
 import numpy as np
 from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
+
+mc = MapConverter(load_coords_from_yaml("../configs/map/map1.yaml"))
+map_polygon = Path(np.array(mc.map_coords_xy_meters))
+#check if points are valid using `map_polygon.contains_point(point)`
 
 def smallest_enclosing_circle(points):
     center = np.mean(points, axis=0)
@@ -60,6 +66,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
+        if not map_polygon.contains_point((optimal_xd, optimal_yd)): optimal_xd, optimal_yd = xd, yd
     else:
         # get points around sheep
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
@@ -77,6 +84,7 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
         last_update = 0
         optimal_xd, optimal_yd, optimal_cost = xd, yd, cost(x, y, xd, yd, xc, yc, simulation)
         for i, (new_xd, new_yd) in enumerate(points):
+            if not map_polygon.contains_point((new_xd, new_yd)): continue
             new_cost = cost(x, y, new_xd, new_yd, xc, yc, simulation)
             if new_cost < optimal_cost:
                 optimal_cost = new_cost
@@ -84,9 +92,9 @@ def find_best_dog_position(x, y, xd, yd, xc, yc,  # ← flock, dog, goal
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
             if i-last_update > early_exit_threshold: break
-    return optimal_xd, optimal_yd, points
+    return optimal_xd, optimal_yd
 
-def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, points, radius_d=1.5):
+def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, radius_d=1.5):
     (xmean, ymean), radius_sheep = smallest_enclosing_circle(np.stack([x, y], axis=1))
 
     fig, ax = plt.subplots()
@@ -111,7 +119,6 @@ def plot_current_state(x, y, xd, yd, xc, yc, optimal_xd, optimal_yd, points, rad
     circle_b = plt.Circle((xmean, ymean), radius_sheep, color='b', fill=False, label='Circle B')
     ax.add_patch(circle_a)
     ax.add_patch(circle_b)
-    plt.scatter(points[:,0], points[:,1])
     plt.scatter([optimal_xd], [optimal_yd], s=100, alpha=0.5, c="r")
 
 
