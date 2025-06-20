@@ -17,14 +17,14 @@ init_cmd: |
   }
 
 windows:
+  - name: mapper
+    tags: ["viz", "mapper"]
+    panes:
+      - "ros2 run auto_shepherd_simulation mapper.py"
+      # - "rviz2"
   - name: simulator
     tags: ["ros_interface", "dog_control_simulator", "dog_control"]
     panes:
       - ros2 run auto_shepherd_simulation ros_interface.py
       - ros2 run auto_shepherd_simulation dog_control_simulator.py
       - ros2 run auto_shepherd_simulation dog_control.py
-  - name: rviz
-    tags: ["viz", "mapper"]
-    panes:
-      - "ros2 run auto_shepherd_simulation mapper.py"
-      - "rviz2"

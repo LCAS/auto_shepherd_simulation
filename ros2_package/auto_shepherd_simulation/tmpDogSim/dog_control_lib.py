@@ -82,6 +82,8 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
             cluster_distances.append([cluster, distance_to_goal])
         cluster_distances.sort(key=lambda x: x[1])
         points = points[labels==cluster_distances[-1][0]]
+        # # set the goal the second furthest cluster
+        # (xc, yc), r = circle_around_points(points[labels==cluster_distances[-2][0]])
 
     (xmean, ymean), radius_sheep = circle_around_points(points)
     radius_sheep = max(radius_sheep, 1) # ensure single sheep clusters have a radius

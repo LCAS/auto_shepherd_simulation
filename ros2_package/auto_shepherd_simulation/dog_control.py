@@ -21,7 +21,7 @@ class DogController(Node):
                                  self._dog_cb, 10)   # :contentReference[oaicite:3]{index=3}
         self.create_subscription(Path, '/sheep/poses_sim',
                                  self._sheep_cb, 10) # :contentReference[oaicite:4]{index=4}
-        self.create_subscription(PoseStamped, '/sheep/goal_pose',
+        self.create_subscription(PoseStamped, '/goal_pose',
                                  self._goal_cb, 10)
 
         # state caches ----------------------------------------------------

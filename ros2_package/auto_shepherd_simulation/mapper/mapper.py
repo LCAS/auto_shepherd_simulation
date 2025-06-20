@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PolygonStamped # Import for PolygonStamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Point32 # Import Point32 for PolygonStamped
 import yaml
 import os
 import tf2_ros
@@ -15,6 +16,7 @@ from auto_shepherd_simulation.utils.geo_converter import MapConverter, load_coor
 class MapperNode(Node):
     def __init__(self):
         super().__init__('mapper_node')
+
         self.declare_parameter('map_file_path', '/home/ros/map/map1.yaml')
 
         # Define the QoS profile for a latched topic
@@ -24,10 +26,17 @@ class MapperNode(Node):
             durability=DurabilityPolicy.TRANSIENT_LOCAL
         )
 
-        # Publisher for the Path message
-        self.publisher_ = self.create_publisher(
+        # # Publisher for the Path message
+        self.publisher_path_ = self.create_publisher( # Renamed for clarity
             Path,
             'FieldBoundaryPath',
+            qos_profile
+        )
+
+        # Publisher for the PolygonStamped message
+        self.publisher_polygon_ = self.create_publisher(
+            PolygonStamped,
+            'field', # Topic name for the PolygonStamped message
             qos_profile
         )
 
@@ -61,8 +70,8 @@ class MapperNode(Node):
             self.origin_utm_x = map_data['origin_utm_x']
             self.origin_utm_y = map_data['origin_utm_y']
 
-            # Get the relative X, Y meters for the path
-            self.path_xy_meters = map_data['map_coords_xy_meters']
+            # Get the relative X, Y meters for the path and polygon
+            self.relative_xy_meters = map_data['map_coords_xy_meters']
 
             self.get_logger().info(f"Map converted. Origin (UTM X, Y): ({self.origin_utm_x:.3f}, {self.origin_utm_y:.3f})")
 
@@ -71,22 +80,32 @@ class MapperNode(Node):
             rclpy.shutdown()
             return
 
-        # 4. Create PoseStamped messages for the Path from the relative meter coordinates
-        self.path_poses = self._create_path_poses(self.path_xy_meters)
+        # 4. Create PoseStamped messages for the Path
+        self.path_poses = self._create_path_poses(self.relative_xy_meters)
         if not self.path_poses:
             self.get_logger().error("Failed to create Path poses from converted data. Shutting down.")
             rclpy.shutdown()
             return
 
+        # 5. Create Point32 messages for the PolygonStamped
+        self.polygon_points = self._create_polygon_points(self.relative_xy_meters)
+        if not self.polygon_points:
+            self.get_logger().error("Failed to create PolygonStamped points from converted data. Shutting down.")
+            rclpy.shutdown()
+            return
+
         # --- Publish Data ---
 
-        # Publish the Path message immediately after loading and converting
+        # Publish the Path message
         self.publish_path_once()
+
+        # Publish the PolygonStamped message
+        self.publish_polygon_once()
 
         # Publish the static transform for 'field_frame'
         self.publish_static_transform()
 
-        self.get_logger().info("Map published once as Path. Static transform published. Node will now spin indefinitely.")
+        self.get_logger().info("Map published once as Path and Polygon. Static transform published. Node will now spin indefinitely.")
 
     def _create_path_poses(self, xy_meters: List[Tuple[float, float]]) -> List[PoseStamped]:
         """
@@ -94,25 +113,22 @@ class MapperNode(Node):
         These poses are in the 'field_frame', which will be offset by the map's UTM origin.
         """
         poses = []
-        # Create an identity quaternion for the poses (no rotation)
         q = quaternion_from_euler(0, 0, 0)
         identity_orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-
-        current_stamp = self.get_clock().now().to_msg() # Use a single stamp for all poses in this path
+        current_stamp = self.get_clock().now().to_msg()
 
         for x_m, y_m in xy_meters:
             pose_stamped = PoseStamped()
             pose_stamped.header.stamp = current_stamp
-            pose_stamped.header.frame_id = 'field_frame' # Poses are relative to 'field_frame'
+            pose_stamped.header.frame_id = 'field_frame'
             pose_stamped.pose.position.x = x_m
             pose_stamped.pose.position.y = y_m
-            pose_stamped.pose.position.z = 0.0 # Assuming 2D path
+            pose_stamped.pose.position.z = 0.0
             pose_stamped.pose.orientation = identity_orientation
             poses.append(pose_stamped)
 
-        # Close the loop for the path visualization in RViz by adding the first point again
+        # Close the loop by adding the first point again
         if poses:
-            # Create a new PoseStamped to avoid modifying the original first pose object
             closed_loop_pose = PoseStamped()
             closed_loop_pose.header.stamp = current_stamp
             closed_loop_pose.header.frame_id = 'field_frame'
@@ -121,8 +137,29 @@ class MapperNode(Node):
             closed_loop_pose.pose.position.z = poses[0].pose.position.z
             closed_loop_pose.pose.orientation = poses[0].pose.orientation
             poses.append(closed_loop_pose)
-
         return poses
+
+    def _create_polygon_points(self, xy_meters: List[Tuple[float, float]]) -> List[Point32]:
+        """
+        Helper to create a list of Point32 messages for PolygonStamped.
+        """
+        points = []
+        for x_m, y_m in xy_meters:
+            p32 = Point32()
+            p32.x = x_m
+            p32.y = y_m
+            p32.z = 0.0 # Assuming 2D polygon
+            points.append(p32)
+
+        # PolygonStamped is implicitly closed if first and last points are the same.
+        # Adding the first point at the end ensures closure for clear visualization.
+        if points:
+            first_point = Point32()
+            first_point.x = points[0].x
+            first_point.y = points[0].y
+            first_point.z = points[0].z
+            points.append(first_point)
+        return points
 
     def publish_path_once(self):
         """Publishes the Path message containing the field boundary."""
@@ -132,12 +169,28 @@ class MapperNode(Node):
 
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map' # The Path itself is defined in the 'map' frame
+        path_msg.header.frame_id = 'map' # The Path itself is defined in the 'map' frame (absolute)
 
         path_msg.poses = self.path_poses
 
-        self.publisher_.publish(path_msg)
+        self.publisher_path_.publish(path_msg)
         self.get_logger().info(f'Published FieldBoundaryPath with {len(path_msg.poses)} poses (once, latched).')
+
+    def publish_polygon_once(self):
+        """Publishes the PolygonStamped message containing the field boundary."""
+        if not self.polygon_points:
+            self.get_logger().warn("No points to publish for PolygonStamped. Skipping publication.")
+            return
+
+        polygon_msg = PolygonStamped()
+        polygon_msg.header.stamp = self.get_clock().now().to_msg()
+        # The PolygonStamped is in 'field_frame' because its points are relative to that origin
+        polygon_msg.header.frame_id = 'field_frame'
+        polygon_msg.polygon.points = self.polygon_points
+
+        self.publisher_polygon_.publish(polygon_msg)
+        self.get_logger().info(f'Published PolygonStamped with {len(polygon_msg.polygon.points)} points (once, latched).')
+
 
     def publish_static_transform(self):
         """Publishes the static transform from 'map' to 'field_frame'."""
@@ -147,7 +200,7 @@ class MapperNode(Node):
         t.child_frame_id = 'field_frame'
 
         # Set the translation to the absolute UTM coordinates of the bounding box origin.
-        # This places 'field_frame' (and thus the relative Path) at its real-world location in 'map'.
+        # This places 'field_frame' (and thus the relative Path/Polygon) at its real-world location in 'map'.
         t.transform.translation.x = self.origin_utm_x
         t.transform.translation.y = self.origin_utm_y
         t.transform.translation.z = 0.0 # Assuming 2D environment
