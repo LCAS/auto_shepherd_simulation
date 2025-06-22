@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.path import Path
 import numpy as np
 from sklearn.cluster import DBSCAN
-from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
-from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
+from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 try:
     mc = MapConverter(load_coords_from_yaml("/home/ros/map/map1.yaml"))

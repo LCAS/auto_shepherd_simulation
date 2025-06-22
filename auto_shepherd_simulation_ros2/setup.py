@@ -3,7 +3,7 @@ from setuptools import setup
 from glob import glob
 import os
 
-package_name = 'auto_shepherd_simulation'
+package_name = 'auto_shepherd_simulation_ros2'
 pkg = package_name
 
 setup(

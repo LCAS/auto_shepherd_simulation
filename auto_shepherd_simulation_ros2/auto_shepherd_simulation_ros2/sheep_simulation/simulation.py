@@ -4,8 +4,8 @@ import random
 import numpy as np
 import yaml
 import os
-from auto_shepherd_simulation.sheep_simulation.sheep import Sheep
-from auto_shepherd_simulation.sheep_simulation.sheepdog import SheepDog, SheepDogController
+from auto_shepherd_simulation_ros2.sheep_simulation.sheep import Sheep
+from auto_shepherd_simulation_ros2.sheep_simulation.sheepdog import SheepDog, SheepDogController
 
 
 
