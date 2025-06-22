@@ -6,8 +6,8 @@ from std_msgs.msg import Float64MultiArray
 import numpy as np
 import math
 # from shapely.geometry import Point, LineString
-from auto_shepherd_simulation.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit, plot_current_state
-from auto_shepherd_simulation.utils.geo_converter import load_coords_from_yaml, MapConverter
+from auto_shepherd_simulation_ros2.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit, plot_current_state
+from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 class DogController(Node):
     def __init__(self):
