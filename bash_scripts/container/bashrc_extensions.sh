@@ -46,4 +46,4 @@ echo "ROS 2 workspace setup and sourced. Happy robot wrangling!"
 # Mark that the setup has been run in this shell session
 export _ROS_WORKSPACE_SETUP_RUN=true
 
-cd ~/base_ws/src/ros2_package/auto_shepherd_simulation
+cd ~/base_ws/src/auto_shepherd_simulation_ros2/auto_shepherd_simulation_ros2

@@ -9,8 +9,8 @@ from geometry_msgs.msg import Point, Vector3, PoseStamped
 from std_msgs.msg import ColorRGBA
 from rclpy.callback_groups import ReentrantCallbackGroup as RCG
 
-from auto_shepherd_simulation.sheep_simulation.simulation import Simulation
-from auto_shepherd_simulation.utils.geo_converter import MapConverter, load_coords_from_yaml
+from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation_ros2.utils.geo_converter import MapConverter, load_coords_from_yaml
 
 class DogControlSimulator(Node):
     def __init__(self):

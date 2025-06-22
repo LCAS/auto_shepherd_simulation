@@ -11,7 +11,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from tf_transformations import quaternion_from_euler
 from typing import List, Tuple
 
-from auto_shepherd_simulation.utils.geo_converter import MapConverter, load_coords_from_yaml
+from auto_shepherd_simulation_ros2.utils.geo_converter import MapConverter, load_coords_from_yaml
 
 class MapperNode(Node):
     def __init__(self):
