@@ -46,4 +46,9 @@ echo "ROS 2 workspace setup and sourced. Happy robot wrangling!"
 # Mark that the setup has been run in this shell session
 export _ROS_WORKSPACE_SETUP_RUN=true
 
-cd ~/base_ws/src/ros2_package/auto_shepherd_simulation
+
+# Define custom functions to control the tmule
+export TMULE_FILE=${BASE_WS}/src/auto_shepherd_simulation_ros2/tmule/launcher.tmule.yaml
+function s(){  tmule -c $TMULE_FILE -W 3 launch ; }
+function t(){  tmule -c $TMULE_FILE terminate ; }
+function r(){  tmule -c $TMULE_FILE -W 3 relaunch ; }
