@@ -9,20 +9,28 @@ from std_msgs.msg import Float64MultiArray, Header
 import numpy as np
 from builtin_interfaces.msg import Duration
 
-class RosInterface(Node):
+class SimDataLoader(Node):
     def __init__(self):
-        super().__init__('ros_interface')
+        super().__init__('sim_data_loader')
+
+        # Connect to drone topics
         self.drone_publisher = self.create_publisher(PoseStamped, '/drone/pose', 10)
+
+        # Connect to dog topics
         self.dog_publisher = self.create_publisher(PoseStamped, '/dog/pose', 10)
+        self.dog_command_subscription = self.create_subscription(PoseStamped, '/dog/command', self.dog_command_callback, 10)
+
+        # Connect to sheep topics
         self.sheep_publisher = self.create_publisher(Path, '/sheep/poses', 10)
+
+        # Connect to target topics
         self.sheep_goal_publisher = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self.sheep_goal_subscriber = self.create_subscription(PoseStamped, '/goal_pose', self.sheep_goal_callback, 10)
-
-        self.dog_command_subscription = self.create_subscription(PoseStamped, '/dog/command', self.dog_command_callback, 10)
-        self.timer = self.create_timer(0.1, self.timer_callback)
-
-        # self.sheep_goal_publisher.publish(sheep_goal_pose)
         self.sheep_goal_pose = self.create_pose_stamped(-38.0, 90.0, 0.0)
+
+        # Define publisher to periodically republish the simulated data
+        #self.timer = self.create_timer(0.1, self.timer_callback)
+        self.timer_callback()
 
     def sheep_goal_callback(self, msg):
         self.sheep_goal_pose = msg
@@ -75,9 +83,9 @@ class RosInterface(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    ros_interface = RosInterface()
-    rclpy.spin(ros_interface)
-    ros_interface.destroy_node()
+    sim_data_loader = SimDataLoader()
+    rclpy.spin(sim_data_loader)
+    sim_data_loader.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

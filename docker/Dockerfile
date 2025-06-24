@@ -149,4 +149,5 @@ RUN echo '[ -f $HOME/bash_scripts/bashrc_extensions.sh ] && \
 # ──────────────────────────────
 # 9. Default shell
 # ──────────────────────────────
-CMD ["bin/bash"]
+#CMD ["/bin/bash"]
+CMD ["tail", "-f", "/dev/null"]
