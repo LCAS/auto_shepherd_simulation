@@ -27,15 +27,19 @@ class MapConverter:
         min_lon = min(c[1] for c in map_coords_latlon)
         max_lon = max(c[1] for c in map_coords_latlon)
 
+        mid_lat = (min_lat+max_lat) / 2
+        mid_lon = (min_lon+max_lon) / 2
+
         self.bounding_box_corners_latlon = {
             'top_left': (max_lat, min_lon),
             'top_right': (max_lat, max_lon),
             'bottom_left': (min_lat, min_lon),
-            'bottom_right': (min_lat, max_lon)
+            'bottom_right': (min_lat, max_lon),
+            'middle': (mid_lat, mid_lon)
         }
 
-        self.origin_lat = self.bounding_box_corners_latlon['top_left'][0]
-        self.origin_lon = self.bounding_box_corners_latlon['top_left'][1]
+        self.origin_lat = self.bounding_box_corners_latlon['middle'][0]
+        self.origin_lon = self.bounding_box_corners_latlon['middle'][1]
 
         self.origin_utm_y, self.origin_utm_x = _transformer_wgs84_to_utm.transform(self.origin_lat, self.origin_lon)
 
@@ -82,28 +86,14 @@ def load_coords_from_yaml(yaml_file_path: str) -> List[Tuple[float, float]]:
       - latitude: float
         longitude: float
     """
-    if not os.path.exists(yaml_file_path):
-        raise FileNotFoundError(f"YAML file not found: {yaml_file_path}")
-
-    try:
-        with open(yaml_file_path, 'r') as file:
-            data = yaml.safe_load(file)
-
-            if 'field_boundary' not in data or not isinstance(data['field_boundary'], list):
-                raise ValueError("YAML file must contain a 'field_boundary' list.")
-
-            coords = []
-            for item in data['field_boundary']:
-                if 'latitude' in item and 'longitude' in item:
-                    coords.append((float(item['latitude']), float(item['longitude'])))
-                else:
-                    print(f"Warning: Skipping malformed point in YAML: {item}")
-            return coords
-    except yaml.YAMLError as e:
-        raise ValueError(f"Error parsing YAML file: {e}")
-    except Exception as e:
-        raise ValueError(f"An unexpected error occurred while loading YAML: {e}")
-
+    with open(yaml_file_path, 'r') as file:
+        data = yaml.safe_load(file)
+        coords = []
+        for item in data['field_boundary']:
+            if 'latitude' in item and 'longitude' in item:
+                coords.append((float(item['latitude']), float(item['longitude'])))
+        return coords
+        
 
 if __name__ == "__main__":
     # Example for the path you previously mentioned:

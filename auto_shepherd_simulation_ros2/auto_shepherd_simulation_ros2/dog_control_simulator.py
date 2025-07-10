@@ -1,13 +1,15 @@
 import os
+import math
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from rclpy.callback_groups import ReentrantCallbackGroup as RCG
+
+from std_msgs.msg import ColorRGBA, UInt16
+from geometry_msgs.msg import Point, Vector3, PoseStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import Path as Path
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point, Vector3, PoseStamped
-from std_msgs.msg import ColorRGBA
-from rclpy.callback_groups import ReentrantCallbackGroup as RCG
 
 from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
 from auto_shepherd_simulation_ros2.utils.geo_converter import MapConverter, load_coords_from_yaml
@@ -18,6 +20,7 @@ class DogControlSimulator(Node):
 
         # Default the storage points for the animal data
         self.sheep_poses = {}    # {sheep_name: [dict, dict, ...]}
+        self.sheep_pose_store = {}
         # self.dog_poses   = {}    # {timestep: {dog_name: PoseStamped}}
         self.dog_state   = None
         self.dog_command = None  # Store the latest dog command
@@ -29,47 +32,49 @@ class DogControlSimulator(Node):
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )
+        self.frame = 0
 
-        # Subscribe to input data
-        self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, qos_profile)
-        self.create_subscription(Path, '/sheep/poses', self._sheep_cb, qos_profile)
+        # For dog connections
+        self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, self.get_qos())
         self.create_subscription(PoseStamped, '/dog/command', self._dog_command_cb, qos_profile, callback_group=RCG())
-
-        # Setup output channels
         self.create_publisher(Path, '/dog_paths', qos_profile)
-        self.marker_pub = self.create_publisher(MarkerArray, '/simulation_markers', qos_profile)
+
+        # For sheep connections
+        self.create_subscription(Path, '/sheep/poses', self._sheep_cb, qos_profile)
+        self.create_subscription(UInt16, '/sheep/randomise', self._sheep_randomise_cb, self.get_qos()) # For sim data
         self.sheep_sim_pub = self.create_publisher(Path, '/sheep/poses_sim', qos_profile)
 
+        # Setup rviz visuals
+        self.marker_pub = self.create_publisher(MarkerArray, '/simulation_markers', qos_profile)
 
+        # Load the field boundaries
         yaml_map_file_path = "/home/ros/map/map1.yaml"
-        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
-        try:
-            field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
-            print(f"Successfully loaded {len(field_coords_latlon)} coordinates from YAML.")
-        except (FileNotFoundError, ValueError) as e:
-            print(f"Failed to load coordinates from YAML: {e}")
-            print("Please ensure the file path is correct and the YAML format matches 'field_boundary: - latitude: X - longitude: Y'.")
-            print("Exiting example.")
-            exit(1) # Exit if cannot load map data
+        self._load_map(yaml_map_file_path)
+        #TODO: self.create_subscription(String, '/field/boundaries', self._load_map, qos_profile)
 
-
-        # Create Map Bounding Box & Convert All Coords
-        try:
-            map_converter = MapConverter(field_coords_latlon)
-            map_data = map_converter.get_map_data()
-
-            self.field_boundary = map_data['map_coords_xy_meters']
-
-        except ValueError as e:
-            print(f"Error during map conversion: {e}")
-            map_converter = None # Ensure map_converter is not set if initialization failed
-
-
-        self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None)
+        # Start Simulation
+        self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None, spawn_random=False)
         self.dt = 0.05
         self.sim_step_timer = self.create_timer(self.dt, self.run_sim_step, callback_group=RCG())
-
         print('Dog Control Simulator Initialised')
+
+
+    def get_qos(self):
+        qos_profile = QoSProfile(
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        return qos_profile
+
+    def _load_map(self, yaml_map_file_path):
+        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
+        field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
+
+        # Create Map Bounding Box & Convert All Coords
+        self.map_converter = MapConverter(field_coords_latlon)
+        map_data = self.map_converter.get_map_data()
+        self.field_boundary = map_data['map_coords_xy_meters']
 
 
 
@@ -77,66 +82,71 @@ class DogControlSimulator(Node):
         """Callback for dog command messages"""
 
         self.dog_command = {
-            'position': [msg.pose.position.x, msg.pose.position.y],
+            'position': [msg.pose.position.y, msg.pose.position.x],
             'orientation': [msg.pose.orientation.x, msg.pose.orientation.y,
                           msg.pose.orientation.z, msg.pose.orientation.w],
             'velocity': [0,0]
         }
         self.get_logger().info(f'Received new dog command: {self.dog_command}')
 
+
     def _dog_cb(self, msg):
-        # timestep = msg.header.secs
-        # dog_name = msg.header.frame_id or 'dog'
-
-        # Initialise storage
-        # if timestep not in self.dog_poses:
-        #     self.dog_poses[timestep] = dict()
-
-        # Save dog position at timestep
-        # self.dog_poses[timestep][dog_name] = msg
-
         self.dog_state = {
             'position': [msg.pose.position.x, msg.pose.position.y],
             'velocity': [0.0, 0.0]          # you can compute real velocity later
         }
+        self.get_logger().info(f"Callback detected for dog now at x:{msg.pose.position.x}, y:{msg.pose.position.y}.")
+
+    def _sheep_randomise_cb(self, msg):
+        self.simulation.num_sheep = msg.data
+        self.simulation.sheep_list = []
+        self.simulation._initialize_sheep(None, spawn_random=True)
+        self.get_logger().info(f"Initialised {msg.data} sheep.")
 
     def _sheep_cb(self, msg):
-        # Get current timestep
-        timestep = msg.header.stamp.sec
-        for sheep in msg.poses:
 
+        self.frame += 1
+        #if not str(self.frame).endswith('0'): return
+
+        # Get current timestep
+        print('_______________')
+        self.sheep_poses = {}
+        for sheep in msg.poses:
+            
             # Create sheep creator
             name = sheep.header.frame_id
             if name not in self.sheep_poses:
                 self.sheep_poses[name] = []
+            if name not in self.sheep_pose_store:
+                self.sheep_pose_store[name] = []
 
             # Get prior pose
             prior = None
-            if self.sheep_poses[name]:
-                prior = self.sheep_poses[name][-1]['position']
+            if self.sheep_pose_store[name]:
+                prior = self.sheep_pose_store[name][-1]['position']
 
             # Save sheep pose data
             pos = sheep.pose.position
-            current = {'position': [pos.x, pos.y]}
+            x, y = self.map_converter.latlon_to_xy(pos.x, pos.y)
+            print(pos.x, pos.y, x, y, self.map_converter.origin_lat, self.map_converter.origin_lon)
+            current = {'position': [x, y]}
+            self.sheep_pose_store[name].append(current)
             if prior:
                 px, py = prior
-                current['velocity'] = [pos.x - px, pos.y - py]
+                current['velocity'] = [x - px, y - py]
+                self.sheep_poses[name].append(current)
 
-            self.sheep_poses[name].append(current)
-        print("sheep poses ready")
-        print(self.simulation, self.dog_state)
-        # ------------- create Simulation once -----------------------------
-        if self.simulation is None and self.dog_state is not None:
-            # flatten current sheep snapshot into list of dicts
-            sheep_states = [hist[-1] for hist in self.sheep_poses.values()]
-            self.simulation = Simulation(
-                self.field_boundary,
-                800, 600,
-                sheep_states=sheep_states,
-                sheepdog_state=self.dog_state
-            )
-            self.get_logger().info('Simulation initialised with '
-                                f'{len(sheep_states)} sheep.')
+        total_tracked = len([len(s) for s in self.sheep_poses if s])
+        self.get_logger().info(f"Callback detected with {len(msg.poses)} sheep, totalling {total_tracked} tracked target ids.")
+
+        # Flatten current sheep snapshot into list of dicts
+        sheep_states = [hist[-1] for hist in self.sheep_poses.values() if hist]
+        self.get_logger().info(f"Sheep positions updated to {len(sheep_states)} sheep.")
+
+        # Update sheep positions in simulation to input
+        self.simulation._initialize_sheep(sheep_states)
+        [print(s[-1]) for s in self.sheep_poses.values() if s]
+
 
     def publish_simulation_state(self, state):
         """Convert simulation state to MarkerArray and publish for RViz visualization"""
@@ -146,7 +156,7 @@ class DogControlSimulator(Node):
         for i, sheep_state in enumerate(state['sheep']):
             # Create sheep marker
             sheep_marker = Marker()
-            sheep_marker.header.frame_id = "map"
+            sheep_marker.header.frame_id = "field_frame"
             sheep_marker.header.stamp = self.get_clock().now().to_msg()
             sheep_marker.ns = "sheep"
             sheep_marker.id = i
@@ -154,8 +164,8 @@ class DogControlSimulator(Node):
             sheep_marker.action = Marker.ADD
 
             # Set sheep position
-            sheep_marker.pose.position.x = sheep_state['position'][0]
-            sheep_marker.pose.position.y = sheep_state['position'][1]
+            sheep_marker.pose.position.x = sheep_state['position'][1]
+            sheep_marker.pose.position.y = sheep_state['position'][0]
             sheep_marker.pose.position.z = 0.0
 
             # Set sheep size
@@ -174,11 +184,11 @@ class DogControlSimulator(Node):
                 vel_marker.action = Marker.ADD
 
                 # Set arrow points
-                start_point = Point(x=sheep_state['position'][0],
-                                  y=sheep_state['position'][1],
+                start_point = Point(x=sheep_state['position'][1],
+                                  y=sheep_state['position'][0],
                                   z=0.0)
-                end_point = Point(x=sheep_state['position'][0] + sheep_state['velocity'][0],
-                                y=sheep_state['position'][1] + sheep_state['velocity'][1],
+                end_point = Point(x=sheep_state['position'][1] + sheep_state['velocity'][1],
+                                y=sheep_state['position'][0] + sheep_state['velocity'][0],
                                 z=0.0)
                 vel_marker.points = [start_point, end_point]
 
@@ -193,7 +203,7 @@ class DogControlSimulator(Node):
         # Create marker for sheepdog
         dog_state = state['sheepdog']
         dog_marker = Marker()
-        dog_marker.header.frame_id = "map"
+        dog_marker.header.frame_id = "field_frame"
         dog_marker.header.stamp = self.get_clock().now().to_msg()
         dog_marker.ns = "sheepdog"
         dog_marker.id = 0
@@ -201,8 +211,8 @@ class DogControlSimulator(Node):
         dog_marker.action = Marker.ADD
 
         # Set dog position
-        dog_marker.pose.position.x = dog_state['position'][0]
-        dog_marker.pose.position.y = dog_state['position'][1]
+        dog_marker.pose.position.x = dog_state['position'][1]
+        dog_marker.pose.position.y = dog_state['position'][0]
         dog_marker.pose.position.z = 0.0
 
         # Set dog size (slightly larger than sheep)
@@ -221,11 +231,11 @@ class DogControlSimulator(Node):
             vel_marker.action = Marker.ADD
 
             # Set arrow points
-            start_point = Point(x=dog_state['position'][0],
-                              y=dog_state['position'][1],
+            start_point = Point(x=dog_state['position'][1],
+                              y=dog_state['position'][0],
                               z=0.0)
-            end_point = Point(x=dog_state['position'][0] + dog_state['velocity'][0],
-                            y=dog_state['position'][1] + dog_state['velocity'][1],
+            end_point = Point(x=dog_state['position'][1] + dog_state['velocity'][1],
+                            y=dog_state['position'][0] + dog_state['velocity'][0],
                             z=0.0)
             vel_marker.points = [start_point, end_point]
 
@@ -240,6 +250,7 @@ class DogControlSimulator(Node):
         # Publish the markers
         self.marker_pub.publish(marker_array)
 
+
     def publish_sheep_path(self, state):
         """Convert simulation['sheep'] list → nav_msgs/Path and publish."""
         path_msg = Path()
@@ -251,8 +262,8 @@ class DogControlSimulator(Node):
             ps = PoseStamped()
             ps.header = path_msg.header          # same stamp / frame
             ps.header.frame_id = f"sheep_{i}"    # optional: unique id
-            ps.pose.position.x = sheep['position'][0]
-            ps.pose.position.y = sheep['position'][1]
+            ps.pose.position.x = sheep['position'][1]
+            ps.pose.position.y = sheep['position'][0]
             ps.pose.position.z = 0.0
             poses.append(ps)
 
@@ -279,6 +290,7 @@ def main():
     node = DogControlSimulator()
     rclpy.spin(node)
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

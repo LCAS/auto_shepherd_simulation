@@ -1,12 +1,14 @@
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from nav_msgs.msg import Path
-from std_msgs.msg import Float64MultiArray
 import numpy as np
 import math
-# from shapely.geometry import Point, LineString
-from auto_shepherd_simulation_ros2.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit, plot_current_state
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, HistoryPolicy
+
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from nav_msgs.msg import Path
+
+from auto_shepherd_simulation_ros2.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit
 from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 class DogController(Node):
@@ -14,16 +16,11 @@ class DogController(Node):
         super().__init__('dog_controller')
 
         # publishers / subscribers ---------------------------------------
-        self.cmd_pub = self.create_publisher(
-            PoseStamped, '/dog/command', 10)   # :contentReference[oaicite:2]{index=2}
-
-        self.create_subscription(PoseStamped, '/dog/pose',
-                                 self._dog_cb, 10)   # :contentReference[oaicite:3]{index=3}
-        self.create_subscription(Path, '/sheep/poses_sim',
-                                 self._sheep_cb, 10) # :contentReference[oaicite:4]{index=4}
-        self.create_subscription(PoseStamped, '/goal_pose',
-                                 self._goal_cb, 10)
-
+        self.cmd_pub = self.create_publisher(PoseStamped, '/dog/command', 10)
+        self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, self.get_qos())
+        self.create_subscription(Path, '/sheep/poses_sim', self._sheep_cb, 10)
+        self.create_subscription(PoseStamped, '/sheep/goal', self._goal_cb, self.get_qos())
+        
         # state caches ----------------------------------------------------
         self.dog_xy   = None              # (x, y)
         self._planned_dog_xy = None       # (x, y) of the last planned dog position
@@ -49,12 +46,20 @@ class DogController(Node):
         try:
             self.map_converter = MapConverter(field_coords_latlon)
             map_data = self.map_converter.get_map_data()
-
             self.field_boundary = map_data['map_coords_xy_meters']
 
         except ValueError as e:
             print(f"Error during map conversion: {e}")
             self.map_converter = None # Ensure map_converter is not set if initialization failed
+
+
+    def get_qos(self):
+        qos_profile = QoSProfile(
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        return qos_profile
 
 
     # ------------ message callbacks -------------------------------------
@@ -137,16 +142,12 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        # if not self.lap_done:
-        #     xd_opt, yd_opt = self._boundary_follow_step()
-        #     print(f"Boundary follow: ({xd_opt:.2f}, {yd_opt:.2f})")
-        # else:
         xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary)
         print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
 
         ps = PoseStamped()
         ps.header.stamp = self.get_clock().now().to_msg()
-        ps.header.frame_id = "map"        # or any frame you prefer
+        ps.header.frame_id = "field_frame"        # or any frame you prefer
         ps.pose.position = Point(x=float(xd_opt), y=float(yd_opt), z=0.0)
         ps.pose.orientation = Quaternion(w=1.0)  # identity; adjust if needed
         self.cmd_pub.publish(ps)
@@ -154,12 +155,7 @@ class DogController(Node):
 
         self._planned_dog_xy = (xd_opt, yd_opt)
 
-        # plot
-        # plot_current_state(xs, ys, xd, yd, xc, yc, xd_opt, yd_opt)
 
-
-# ----------------------------------------------------------------------
-# entry-point -----------------------------------------------------------
 def main(args=None):
     rclpy.init(args=args)
     node = DogController()
