@@ -7,6 +7,7 @@ from rclpy.qos import QoSProfile, DurabilityPolicy, HistoryPolicy
 
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from nav_msgs.msg import Path
+from visualization_msgs.msg import MarkerArray
 
 from auto_shepherd_simulation_ros2.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit
 from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
@@ -20,7 +21,8 @@ class DogController(Node):
         self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, self.get_qos())
         self.create_subscription(Path, '/sheep/poses_sim', self._sheep_cb, 10)
         self.create_subscription(PoseStamped, '/sheep/goal', self._goal_cb, self.get_qos())
-        
+        self.marker_pub = self.create_publisher(MarkerArray, "/dbscan_hulls", 10)
+
         # state caches ----------------------------------------------------
         self.dog_xy   = None              # (x, y)
         self._planned_dog_xy = None       # (x, y) of the last planned dog position
@@ -142,7 +144,7 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary)
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary, boundary_pub=self.marker_pub)
         print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
 
         ps = PoseStamped()

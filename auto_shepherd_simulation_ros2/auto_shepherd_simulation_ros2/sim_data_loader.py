@@ -65,7 +65,7 @@ class SimDataLoader(Node):
 
     def start_simulated_sheep(self):
         # Publish to the initialise random sheep poses
-        count = 10
+        count = 40
         self.get_logger().info(f"Initialising {count} sheep randomly.")
         self.sheep_publisher.publish(UInt16(data=count))
 
