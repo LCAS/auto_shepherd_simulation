@@ -8,6 +8,14 @@ from sklearn.cluster import DBSCAN
 from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
 from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
+import numpy as np
+from scipy.spatial import ConvexHull, Delaunay
+from visualization_msgs.msg import Marker, MarkerArray
+from builtin_interfaces.msg import Duration
+from geometry_msgs.msg import Point
+from std_msgs.msg import Header, ColorRGBA
+import random
+
 try:
     mc = MapConverter(load_coords_from_yaml("/home/ros/map/map1.yaml"))
 except:
@@ -63,15 +71,66 @@ def cost(x, y, xd, yd, xc, yc, simulation, distance_weight = 1):
     #return angle(xvel, yvel, xveldesired, yveldesired) # penalise distance to closest sheep, reject if within 2m of sheep
 
 
+def color_for_label(label):
+    random.seed(label)
+    return ColorRGBA(r=random.random(), g=random.random(), b=random.random(), a=0.3)
+
+def render_dbscan_convex_hulls(pub, db, points, frame_id="map", z=0.0):
+    marker_array = MarkerArray()
+    labels = db.labels_
+    unique_labels = set(labels)
+    
+    marker_id = 0
+    for label in unique_labels:
+        if label == -1:
+            continue  # Skip noise
+
+        cluster_points = points[labels == label]
+
+        if len(cluster_points) < 3:
+            continue  # Can't form a hull
+
+        try:
+            hull = ConvexHull(cluster_points[:, :2])
+            delaunay = Delaunay(cluster_points[hull.vertices, :2])
+        except:
+            continue  # Skip invalid hull
+
+        marker = Marker()
+        marker.header = Header(frame_id=frame_id)
+        marker.ns = "dbscan_hulls"
+        marker.id = marker_id
+        marker.type = Marker.TRIANGLE_LIST
+        marker.action = Marker.ADD
+        marker.scale.x = marker.scale.y = marker.scale.z = 1.0
+        marker.pose.orientation.w = 1.0
+        marker.color = color_for_label(label)
+        marker.lifetime = Duration(sec=1, nanosec=500_000_000)  # 1.5 seconds
+
+        for simplex in delaunay.simplices:
+            for idx in simplex:
+                pt = cluster_points[hull.vertices[idx]]
+                p = Point()
+                p.x, p.y = pt[0], pt[1]
+                p.z = pt[2] if pt.shape[0] == 3 else z
+                marker.points.append(p)
+
+        marker_array.markers.append(marker)
+        marker_id += 1
+
+    pub.publish(marker_array)
+
 def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
                            radius_d=1.4, n_candidates=15, early_exit_threshold=5,
-                           default_goto=np.asarray((0,0))):
+                           default_goto=np.asarray((0,0)), boundary_pub=None):
     """Return optimal dog (x_d*, y_d*) given current flock and goal."""
 
     points = np.stack([x, y], axis=1)
     goal_point = np.array([xc,yc])
 
     db = DBSCAN(eps=10, min_samples=1).fit(points)
+    if boundary_pub:
+        render_dbscan_convex_hulls(boundary_pub, db, points)
     labels = db.labels_
     cluster_distances = []
     print(f"{len(np.unique(labels))} clusters found")

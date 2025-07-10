@@ -156,7 +156,7 @@ class CoordinateTransformer:
         return closest_point
 
 class Simulation:
-    def __init__(self, field_boundary, screen_width=800, screen_height=600, sheep_states=None, sheepdog_state=None):
+    def __init__(self, field_boundary, screen_width=800, screen_height=600, sheep_states=None, sheepdog_state=None, spawn_random=False):
         """Initialize simulation with field boundary
 
         Args:
@@ -191,7 +191,7 @@ class Simulation:
         # Create a list of sheep
         self.num_sheep = 50 if sheep_states is None else len(sheep_states)
         self.sheep_list = []
-        self._initialize_sheep(sheep_states)
+        self._initialize_sheep(sheep_states, spawn_random=spawn_random)
 
         # Flocking parameters
         self.alignment_weight = 1.0
@@ -201,9 +201,9 @@ class Simulation:
         # for i in range(200):
         #     self.update(0.05)
 
-    def _initialize_sheep(self, sheep_states=None):
+    def _initialize_sheep(self, sheep_states=None, spawn_random=False):
         """Initialize sheep with given states or random positions"""
-        if sheep_states is None:
+        if spawn_random:
             print('random sheep init')
             # Initialize with random positions within field boundary
             for _ in range(self.num_sheep):
@@ -222,13 +222,12 @@ class Simulation:
                             coord_transformer=self.coord_transformer
                         ))
                         break
-        else:
+        elif sheep_states is not None:
             # Initialize with given states
+            self.sheep_list = []
             for state in sheep_states:
-                if not isinstance(state, dict) or 'position' not in state:
-                    raise ValueError("Sheep states must be provided as dictionaries with 'position' key")
                 position = state['position']
-                velocity = state.get('velocity', [0, 0])  # Default to zero velocity if not provided
+                velocity = state.get('velocity', [0.01, 0.01])  # Default to zero velocity if not provided
                 self.sheep_list.append(Sheep(
                     position=position,
                     velocity=velocity,
@@ -309,7 +308,7 @@ class Game:
         field_boundary = load_map_config(map_file)
 
         # Initialize simulation
-        self.simulation = Simulation(field_boundary, width, height)
+        self.simulation = Simulation(field_boundary, width, height, spawn_random=True)
 
         # Initialize sheepdog controller
         self.sheepdog_controller = SheepDogController(self.simulation.sheepdog, width, height)

@@ -22,7 +22,7 @@ setup(
     license='TODO: License declaration',
     entry_points={
         'console_scripts': [
-            f'ros_interface.py = {pkg}.ros_interface:main',
+            f'sim_data_loader.py = {pkg}.sim_data_loader:main',
             f'boid_training_simulator.py = {pkg}.boid_training_simulator:main',
             f'dog_control.py = {pkg}.dog_control:main',
             f'dog_control_simulator.py = {pkg}.dog_control_simulator:main',

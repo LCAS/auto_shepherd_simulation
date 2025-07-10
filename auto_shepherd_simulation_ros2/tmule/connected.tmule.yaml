@@ -1,0 +1,30 @@
+session: simulator
+init_cmd: |
+  echo " "
+  echo " "
+  echo " "
+  echo "Running Initialisation"
+
+  #exec /bin/bash
+  cd @TMULE_CONFIG_DIR@ || true
+  set -o pipefail
+
+  # Source the .bashrc
+  source ~/.bashrc
+
+  # Setup ROS2 DDS Settings
+  export ROS_DOMAIN_ID=70
+  unset ROS_LOCALHOST_ONLY
+
+windows:
+
+  - name: system
+    panes:
+      - ros2 run auto_shepherd_simulation_ros2 dog_control_simulator.py
+      - ros2 run auto_shepherd_simulation_ros2 dog_control.py
+
+  - name: outputs
+    panes:
+      - rviz2
+
+
