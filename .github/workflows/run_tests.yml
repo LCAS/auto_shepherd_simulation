@@ -22,7 +22,14 @@ jobs:
         run: |
           chmod +x docker_start.sh
           ./docker_start.sh &
-          sleep 10  # give it some time to start
+          for i in {1..60}; do
+            if docker ps --filter "name=auto_shepherd_simulation_ros2_humble" --filter "status=running" | grep auto_shepherd_simulation_ros2_humble; then
+              echo "Container is running."
+              break
+            fi
+            echo "Waiting for container to start..."
+            sleep 2
+          done
 
       - name: Check for /dbscan_hulls Topic Message
         run: |
