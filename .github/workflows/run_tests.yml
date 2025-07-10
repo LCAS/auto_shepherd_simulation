@@ -1,4 +1,4 @@
-name: Run Tests
+name: CI - ROS2 Simulation
 
 on:
   pull_request:
@@ -8,24 +8,24 @@ on:
     branches: [main, develop]
 
 jobs:
-  ros-tests:
+  ros2-simulation-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Prepare files for Docker build
+      - name: Set up Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
+
+      - name: Build and Start Simulation
+        working-directory: docker
         run: |
-          mkdir -p docker_build/src
-          cp ros2_package/auto_shepherd_simulation/ros_interface.py docker_build/src/ros_interface.py
-          cp -r tests docker_build/tests
-          cp tests/Dockerfile.test docker_build/Dockerfile
+          chmod +x docker_start.sh
+          ./docker_start.sh &
+          sleep 10  # give it some time to start
 
-      - name: Build ROS Test Container
+      - name: Check for /dbscan_hulls Topic Message
         run: |
-          cd docker_build
-          docker build -t ros_test .
-
-      - name: Run ROS Tests
-        run: docker run ros_test
+          timeout 30 docker exec -i auto_shepherd_simulation_ros2_humble \
+            bash -c 'source /home/ros/base_ws/install/setup.bash && \
+                     ros2 topic echo /dbscan_hulls --once'
