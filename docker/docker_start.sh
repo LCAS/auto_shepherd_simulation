@@ -29,12 +29,13 @@ echo "Docker Compose cleanup completed."
 # --- Run the Docker Compose service interactively ---
 echo "Starting Docker Compose service '${SERVICE_NAME}' in interactive mode..."
 
-docker compose -f "${COMPOSE_FILE}" run \
-    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
-    -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
-    -e QT_X11_NO_MITSHM=1 \
-    "${DOCKER_RUN_ARGS[@]}" \
-    "${SERVICE_NAME}" \
-    bash
+docker compose -f "${COMPOSE_FILE}" up -d "${SERVICE_NAME}"
+#docker compose -f "${COMPOSE_FILE}" run \
+#    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
+#    -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
+#    -e QT_X11_NO_MITSHM=1 \
+#    "${DOCKER_RUN_ARGS[@]}" \
+#    "${SERVICE_NAME}" \
+#    bash
 
 echo "Docker container session ended."
