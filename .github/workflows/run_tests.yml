@@ -72,21 +72,21 @@ jobs:
             github_action_initialise_tmule
 
             for attempt in {1..3}; do
-              echo \"\\n🌀 Attempt \$attempt to trigger and read /dbscan_hulls\"
+              echo \"Attempt \$attempt to trigger and read /dbscan_hulls\"
 
               github_action_initialise_dog
               github_action_initialise_goal
 
-              echo \"🔍 Checking topic list and /dbscan_hulls info\"
+              echo \"Checking topic list and /dbscan_hulls info\"
               ros2 topic list
               ros2 topic info /dbscan_hulls -v || echo 'No info for /dbscan_hulls yet'
 
-              echo \"⏳ Waiting up to 60s for a MarkerArray message on /dbscan_hulls...\"
-              if timeout 60s ros2 topic echo /dbscan_hulls visualization_msgs/msg/MarkerArray --once; then
-                echo \"✅ Successfully received /dbscan_hulls on attempt \$attempt\"
+              echo \"Waiting up to 60s for a MarkerArray message on /dbscan_hulls...\"
+              if timeout 60s ros2 topic echo /dbscan_hulls visualization_msgs/msg/MarkerArray --no-arr --once; then
+                echo \"Successfully received /dbscan_hulls on attempt \$attempt\"
                 exit 0
               else
-                echo \"⚠️ No message received on /dbscan_hulls (attempt \$attempt)\"
+                echo \"No message received on /dbscan_hulls (attempt \$attempt)\"
               fi
 
               sleep 5
