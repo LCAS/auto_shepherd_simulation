@@ -42,6 +42,11 @@ docker compose -f "${COMPOSE_FILE}" up -d "${SERVICE_NAME}"
 docker ps --filter "name=${SERVICE_NAME}" --filter "status=running" | grep ${SERVICE_NAME} > /dev/null
 if [ $? -ne 0 ]; then
     echo "Container failed to start!"
+    docker ps -a
+    docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found for container."
     exit 1
 fi
+echo "Container started successfully."
+docker ps -a
+docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found for container."
 echo "Docker container session ended."

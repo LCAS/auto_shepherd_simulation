@@ -37,6 +37,13 @@ jobs:
             sleep 2
           done
 
+          if ! docker ps --filter "name=auto_shepherd_simulation_ros2_humble" --filter "status=running" | grep auto_shepherd_simulation_ros2_humble; then
+            echo "ERROR: Container auto_shepherd_simulation_ros2_humble failed to start."
+            docker ps -a
+            docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found."
+            exit 1
+          fi
+
       - name: Show Docker Compose Status and Logs
         working-directory: docker
         run: |
