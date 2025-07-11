@@ -45,7 +45,7 @@ jobs:
 
       - name: Smoke Test Container
         run: |
-          docker exec auto_shepherd_simulation_ros2_humble ros2 --help
+          docker exec auto_shepherd_simulation_ros2_humble bash -c "source /opt/ros/humble/setup.bash && ros2 --help"
 
       - name: Print ROS2 Nodes and Topics
         run: |
