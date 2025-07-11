@@ -38,4 +38,10 @@ docker compose -f "${COMPOSE_FILE}" up -d "${SERVICE_NAME}"
 #    "${SERVICE_NAME}" \
 #    bash
 
+# Check if the container started successfully
+docker ps --filter "name=${SERVICE_NAME}" --filter "status=running" | grep ${SERVICE_NAME} > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Container failed to start!"
+    exit 1
+fi
 echo "Docker container session ended."

@@ -17,9 +17,15 @@ jobs:
       - name: Set up Docker Compose
         run: sudo apt-get update && sudo apt-get install -y docker-compose
 
+      - name: Cleanup Docker
+        run: |
+          docker container prune -f
+          docker volume prune -f
+
       - name: Build and Start Simulation
         working-directory: docker
         run: |
+          set -e
           chmod +x docker_start.sh
           ./docker_start.sh | tee docker_start_output.log &
           for i in {1..60}; do
@@ -31,6 +37,12 @@ jobs:
             sleep 2
           done
 
+      - name: Show Docker Compose Status and Logs
+        working-directory: docker
+        run: |
+          docker compose ps
+          docker compose logs --tail=50 auto_shepherd_simulation_ros2_humble
+
       - name: Print Docker Container Logs if Not Running
         if: ${{ failure() || !steps.build-and-start-simulation.outcome == 'success' }}
         run: |
@@ -38,6 +50,15 @@ jobs:
           docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found."
           echo "Docker ps output:"
           docker ps -a
+
+      - name: Smoke Test Container
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble ros2 --help
+
+      - name: Print ROS2 Nodes and Topics
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c \
+            "source /home/ros/base_ws/install/setup.bash && ros2 node list && ros2 topic list"
 
       - name: Check for /dbscan_hulls Topic Message
         run: |
