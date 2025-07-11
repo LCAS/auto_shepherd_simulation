@@ -1,4 +1,4 @@
-name: Run Tests
+name: CI - ROS2 Simulation
 
 on:
   pull_request:
@@ -8,24 +8,90 @@ on:
     branches: [main, develop]
 
 jobs:
-  ros-tests:
+  ros2-simulation-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Prepare files for Docker build
+      - name: Set up Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
+
+      - name: Cleanup Docker
         run: |
-          mkdir -p docker_build/src
-          cp ros2_package/auto_shepherd_simulation/ros_interface.py docker_build/src/ros_interface.py
-          cp -r tests docker_build/tests
-          cp tests/Dockerfile.test docker_build/Dockerfile
+          docker container prune -f
+          docker volume prune -f
 
-      - name: Build ROS Test Container
+      - name: Build and Start Simulation
+        working-directory: docker
         run: |
-          cd docker_build
-          docker build -t ros_test .
+          set -e
+          chmod +x docker_start.sh
+          ./docker_start.sh | tee docker_start_output.log
 
-      - name: Run ROS Tests
-        run: docker run ros_test
+      - name: Show Docker Compose Status and Logs
+        working-directory: docker
+        run: |
+          docker compose ps
+          docker compose logs --tail=50 auto_shepherd_simulation_ros2_humble
+
+      - name: Print Docker Container Logs if Not Running
+        if: ${{ failure() || !steps.build-and-start-simulation.outcome == 'success' }}
+        run: |
+          echo "Container logs:"
+          docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found."
+          echo "Docker ps output:"
+          docker ps -a
+
+      - name: Smoke Test Container
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c "source /opt/ros/humble/setup.bash && ros2 --help"
+
+
+      - name: Build ROS2 Workspace
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c \
+            "source /opt/ros/humble/setup.bash && \
+             cd /home/ros/base_ws && \
+             colcon build --symlink-install"
+
+      - name: List ROS2 Topics
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c \
+            "source /opt/ros/humble/setup.bash && \
+             source /home/ros/base_ws/install/setup.bash && \
+             ros2 topic list"
+
+      - name: Wait for and Echo /dbscan_hulls
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c "
+            set -e
+            source /opt/ros/humble/setup.bash
+            source /home/ros/bash_scripts/bashrc_extensions.sh
+
+            github_action_initialise_tmule
+
+            for attempt in {1..3}; do
+              echo \"Attempt \$attempt to trigger and read /dbscan_hulls\"
+
+              github_action_initialise_dog
+              github_action_initialise_goal
+
+              echo \"Checking topic list and /dbscan_hulls info\"
+              ros2 topic list
+              ros2 topic info /dbscan_hulls -v || echo 'No info for /dbscan_hulls yet'
+
+              echo \"Waiting up to 60s for a MarkerArray message on /dbscan_hulls...\"
+              if timeout 60s ros2 topic echo /dbscan_hulls visualization_msgs/msg/MarkerArray --no-arr --once; then
+                echo \"Successfully received /dbscan_hulls on attempt \$attempt\"
+                exit 0
+              else
+                echo \"No message received on /dbscan_hulls (attempt \$attempt)\"
+              fi
+
+              sleep 5
+            done
+
+            echo \"❌ Failed to receive /dbscan_hulls after 3 attempts\"
+            exit 1
+          "

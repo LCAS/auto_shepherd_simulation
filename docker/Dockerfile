@@ -116,6 +116,7 @@ RUN apt-get update && \
 
 # 5. Python pip installs
 RUN python3 -m pip install --no-cache-dir --upgrade \
+    --ignore-installed \
     pip wheel \
     setuptools==58.2.0 \
     packaging==24.2 \
