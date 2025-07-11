@@ -62,8 +62,14 @@ jobs:
              source /home/ros/base_ws/install/setup.bash && \
              ros2 topic list"
 
-      - name: Check for /dbscan_hulls Topic Message
+      - name: Initialise and Check for /dbscan_hulls
         run: |
-          timeout 30 docker exec -i auto_shepherd_simulation_ros2_humble \
-            bash -c 'source /home/ros/base_ws/install/setup.bash && \
-                     ros2 topic echo /dbscan_hulls --once'
+          docker exec auto_shepherd_simulation_ros2_humble bash -c "
+            set -e
+            source /opt/ros/humble/setup.bash
+            source /home/ros/bash_scripts/bashrc_extensions.sh
+            github_action_initialise_tmule
+            github_action_initialise_dog
+            github_action_initialise_goal
+            timeout 30s ros2 topic echo /dbscan_hulls --once
+          "

@@ -64,3 +64,92 @@ function con(){  tmule -c $CONNECTED $1 ; }
 # TMuLe for injecting data to inputs
 export INJECTED=${BASE_WS}/src/auto_shepherd_simulation_ros2/tmule/injected.tmule.yaml
 function inj(){  tmule -c $INJECTED $1 ; }
+
+
+################################
+## Aliases for github actions ##
+################################
+
+function github_action_initialise_tmule() { tmule -c $INJECTED launch ; }
+
+function github_action_initialise_goal()
+{
+ros2 topic pub /goal_pose geometry_msgs/msg/PoseStamped "header:
+  stamp:
+    sec: 1752234451
+    nanosec: 558437227
+  frame_id: field_frame
+pose:
+  position:
+    x: -15.754144668579102
+    y: 44.95618438720703
+    z: 0.0
+  orientation:
+    x: 0.0
+    y: 0.0
+    z: -0.0721578213596985
+    w: 0.9973932267749877
+" ;
+}
+
+function github_action_initialise_dog()
+{
+ros2 topic pub /initialpose geometry_msgs/msg/PoseWithCovarianceStamped "header:
+  stamp:
+    sec: 1752234463
+    nanosec: 6465847
+  frame_id: field_frame
+pose:
+  pose:
+    position:
+      x: -19.47688865661621
+      y: 8.73109245300293
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.25
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.25
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.06853891909122467
+" ;
+}
+
+
+
+
