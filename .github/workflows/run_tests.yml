@@ -21,7 +21,7 @@ jobs:
         working-directory: docker
         run: |
           chmod +x docker_start.sh
-          ./docker_start.sh &
+          ./docker_start.sh | tee docker_start_output.log &
           for i in {1..60}; do
             if docker ps --filter "name=auto_shepherd_simulation_ros2_humble" --filter "status=running" | grep auto_shepherd_simulation_ros2_humble; then
               echo "Container is running."
