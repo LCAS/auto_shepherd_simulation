@@ -71,5 +71,8 @@ jobs:
             github_action_initialise_tmule
             github_action_initialise_dog
             github_action_initialise_goal
-            timeout 30s ros2 topic echo /dbscan_hulls --once
+            echo 'Waiting for /dbscan_hulls to appear...'
+            ros2 topic list
+            ros2 topic info /dbscan_hulls || echo 'No info for /dbscan_hulls yet'
+            timeout 60s ros2 topic echo /dbscan_hulls --once
           "
