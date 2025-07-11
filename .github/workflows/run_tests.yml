@@ -31,6 +31,14 @@ jobs:
             sleep 2
           done
 
+      - name: Print Docker Container Logs if Not Running
+        if: ${{ failure() || !steps.build-and-start-simulation.outcome == 'success' }}
+        run: |
+          echo "Container logs:"
+          docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found."
+          echo "Docker ps output:"
+          docker ps -a
+
       - name: Check for /dbscan_hulls Topic Message
         run: |
           timeout 30 docker exec -i auto_shepherd_simulation_ros2_humble \
