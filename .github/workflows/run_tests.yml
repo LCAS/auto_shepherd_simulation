@@ -27,22 +27,7 @@ jobs:
         run: |
           set -e
           chmod +x docker_start.sh
-          ./docker_start.sh | tee docker_start_output.log &
-          for i in {1..60}; do
-            if docker ps --filter "name=auto_shepherd_simulation_ros2_humble" --filter "status=running" | grep auto_shepherd_simulation_ros2_humble; then
-              echo "Container is running."
-              break
-            fi
-            echo "Waiting for container to start..."
-            sleep 2
-          done
-
-          if ! docker ps --filter "name=auto_shepherd_simulation_ros2_humble" --filter "status=running" | grep auto_shepherd_simulation_ros2_humble; then
-            echo "ERROR: Container auto_shepherd_simulation_ros2_humble failed to start."
-            docker ps -a
-            docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found."
-            exit 1
-          fi
+          ./docker_start.sh | tee docker_start_output.log
 
       - name: Show Docker Compose Status and Logs
         working-directory: docker

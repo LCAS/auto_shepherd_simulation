@@ -4,7 +4,8 @@
 COMPOSE_FILE="docker-compose.yml"
 SERVICE_NAME="auto_shepherd_simulation_ros2_humble"
 
-xhost +local:docker
+command -v xhost >/dev/null && xhost +local:docker
+#xhost +local:docker
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     HOST_DISPLAY_VAR="$DISPLAY"
