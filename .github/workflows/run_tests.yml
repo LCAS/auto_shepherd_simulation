@@ -62,7 +62,7 @@ jobs:
              source /home/ros/base_ws/install/setup.bash && \
              ros2 topic list"
 
-      - name: Initialise and Check for /dbscan_hulls
+      - name: Wait for and Echo /dbscan_hulls
         run: |
           docker exec auto_shepherd_simulation_ros2_humble bash -c "
             set -e
@@ -71,8 +71,9 @@ jobs:
             github_action_initialise_tmule
             github_action_initialise_dog
             github_action_initialise_goal
-            echo 'Waiting for /dbscan_hulls to appear...'
+            echo 'Waiting for /dbscan_hulls'
             ros2 topic list
             ros2 topic info /dbscan_hulls || echo 'No info for /dbscan_hulls yet'
-            timeout 60s ros2 topic echo /dbscan_hulls --once
+            echo 'Waiting for /dbscan_hulls to publish...'
+            timeout 60s ros2 topic echo /dbscan_hulls visualization_msgs/msg/MarkerArray --once
           "
