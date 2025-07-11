@@ -47,10 +47,20 @@ jobs:
         run: |
           docker exec auto_shepherd_simulation_ros2_humble bash -c "source /opt/ros/humble/setup.bash && ros2 --help"
 
-      - name: Print ROS2 Nodes and Topics
+
+      - name: Build ROS2 Workspace
         run: |
           docker exec auto_shepherd_simulation_ros2_humble bash -c \
-            "source /home/ros/base_ws/install/setup.bash && ros2 node list && ros2 topic list"
+            "source /opt/ros/humble/setup.bash && \
+             cd /home/ros/base_ws && \
+             colcon build --symlink-install"
+
+      - name: List ROS2 Topics
+        run: |
+          docker exec auto_shepherd_simulation_ros2_humble bash -c \
+            "source /opt/ros/humble/setup.bash && \
+             source /home/ros/base_ws/install/setup.bash && \
+             ros2 topic list"
 
       - name: Check for /dbscan_hulls Topic Message
         run: |
