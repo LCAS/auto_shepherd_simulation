@@ -1,28 +1,21 @@
 
 import math as maths
+import random
+
+import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
-import numpy as np
-from sklearn.cluster import DBSCAN
-from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
-from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
-
-import numpy as np
 from scipy.spatial import ConvexHull, Delaunay
-from visualization_msgs.msg import Marker, MarkerArray
+from sklearn.cluster import DBSCAN
+
+from std_msgs.msg import Header, ColorRGBA
 from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import Point
-from std_msgs.msg import Header, ColorRGBA
-import random
+from visualization_msgs.msg import Marker, MarkerArray
 
-try:
-    mc = MapConverter(load_coords_from_yaml("/home/ros/map/map1.yaml"))
-except:
-    mc = MapConverter(load_coords_from_yaml("../configs/map/map1.yaml"))
-
-map_polygon = Path(np.array(mc.map_coords_xy_meters))
-#check if points are valid using `map_polygon.contains_point(point)`
+from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
+from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 def circle_around_points(points):
     diff = points[:, np.newaxis, :] - points[np.newaxis, :, :]
@@ -75,7 +68,7 @@ def color_for_label(label):
     random.seed(label)
     return ColorRGBA(r=random.random(), g=random.random(), b=random.random(), a=0.3)
 
-def render_dbscan_convex_hulls(pub, db, points, frame_id="map", z=0.0):
+def render_dbscan_convex_hulls(pub, db, points, frame_id="field_frame", z=0.0):
     marker_array = MarkerArray()
     labels = db.labels_
     unique_labels = set(labels)
@@ -120,11 +113,61 @@ def render_dbscan_convex_hulls(pub, db, points, frame_id="map", z=0.0):
 
     pub.publish(marker_array)
 
+
+def render_targets_points(targets_pub, scores, best):
+    marker_array = MarkerArray()
+    header = Header(frame_id="field_frame")
+
+    max_score = max(
+        (abs(s['cost']) for s in scores.values() if s['cost'] != -1),
+        default=1.0
+    )
+
+    for i, data in scores.items():
+        marker = Marker()
+        marker.header = header
+        marker.ns = "target_points"
+        marker.id = i
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+
+        marker.pose.position.x = data['x']
+        marker.pose.position.y = data['y']
+        marker.pose.position.z = 0.2
+
+        # Twice as big and proportional to normalized score (except for -1)
+        if data['cost'] == -1:
+            scale = 0.3  # default size for invalid scores
+        elif data['cost'] == -2:
+            scale = 0.3  # default size for invalid scores
+        else:
+            scale = 2.0 * (0.2 + 0.8 * (abs(data['cost']) / max_score))
+
+        marker.scale.x = marker.scale.y = scale
+        marker.scale.z = 0.1  # Cylinder height
+
+        # Color conditions
+        if data == best:
+            marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.5)  # Green
+        elif data['cost'] == -1:
+            marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.5)  # Black
+        elif data['cost'] == -2:
+            marker.color = ColorRGBA(r=0.0, g=0.0, b=1.0, a=0.5)  # Blue
+        else:
+            marker.color = ColorRGBA(r=1.0, g=1.0, b=0.0, a=0.5)  # Yellow
+
+        marker.lifetime.sec = 1
+        marker_array.markers.append(marker)
+
+    targets_pub.publish(marker_array)
+
+
 def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, dog, goal
                            radius_d=1.4, n_candidates=15, early_exit_threshold=5,
-                           default_goto=np.asarray((0,0)), boundary_pub=None):
-    """Return optimal dog (x_d*, y_d*) given current flock and goal."""
+                           default_goto=np.asarray((0,0)),
+                           boundary_pub=None, targets_pub=None):
 
+    """Return optimal dog (x_d*, y_d*) given current flock and goal."""
     points = np.stack([x, y], axis=1)
     goal_point = np.array([xc,yc])
 
@@ -150,25 +193,41 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
     d = np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xd, yd]))
     if np.linalg.norm(np.asarray([xmean, ymean]) - np.asarray([xc, yc])) < 5:
         d = np.linalg.norm(np.asarray([-10, 10]) - np.asarray([xd, yd]))
-        if d < 3: optimal_xd, optimal_yd = xd, yd
+        if d < 3:
+            optimal_xd, optimal_yd = xd, yd
         else:
             closest_point = (xd + (-10 - xd) * radius_d / d, yd + (10 - yd) * radius_d / d)
             points = np.array([closest_point])
             optimal_xd, optimal_yd = closest_point
+        scores = {0: {'x': optimal_xd, 'y': optimal_yd, 'cost': 1}}
+        best = min(scores.values(), key=lambda s: s['cost'])
+        optimal_xd, optimal_yd = best['x'], best['y']
+
+    # 
     elif d > radius_d + radius_sheep:
         print("Moving towards sheep")
         closest_point = (xd + (xmean - xd) * radius_d / d, yd + (ymean - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
+        scores = {0: {'x': optimal_xd, 'y': optimal_yd, 'cost': 1}}
+        best = min(scores.values(), key=lambda s: s['cost'])
+        optimal_xd, optimal_yd = best['x'], best['y']
+
+    # 
     elif d < abs(radius_d - radius_sheep):
         print("Moving away from sheep")
         d = np.linalg.norm(default_goto - np.asarray([xd, yd]))
         closest_point = (xd + (default_goto[0] - xd) * radius_d / d, yd + (default_goto[1] - yd) * radius_d / d)
         points = np.array([closest_point])
         optimal_xd, optimal_yd = closest_point
+        scores = {0: {'x': optimal_xd, 'y': optimal_yd, 'cost': 1}}
+        best = min(scores.values(), key=lambda s: s['cost'])
+        optimal_xd, optimal_yd = best['x'], best['y']
+
+    # Otherwise is actively pressuring the closest group
     else:
         print("Herding sheep")
-        # get points around sheep
+        # get points in an arc around the sheep
         angle_a = np.arccos((radius_sheep**2 + d**2 - radius_d**2) / (2 * radius_sheep * d))
         angle_start = np.arctan2(yd - ymean, xd - xmean)
         angle_range = (angle_start - angle_a, angle_start + angle_a)
@@ -183,15 +242,37 @@ def find_best_dog_position(x, y, xd, yd, xc, yc, field_boundary,  # ← flock, d
         # optimise new dog position
         last_update = 0
         optimal_xd, optimal_yd, optimal_cost = xd, yd, cost(x, y, xd, yd, xc, yc, simulation)
+        scores = dict()
         for i, (new_xd, new_yd) in enumerate(points):
-            if not map_polygon.contains_point((new_xd, new_yd)): continue
+            scores[i] = {'x': new_xd, 'y': new_yd, 'cost': -1}
+
+            # Check if point is within map
+            map_polygon = Path(np.array(field_boundary))
+            if not map_polygon.contains_point((new_xd, new_yd)):
+                scores[i]['cost'] = -2
+                continue
+
+            # Calculate cost of point using simulation
             new_cost = cost(x, y, new_xd, new_yd, xc, yc, simulation)
+            scores[i]['cost'] = new_cost
+
+            # If cost is better, reject old cost
             if new_cost < optimal_cost:
                 optimal_cost = new_cost
                 optimal_xd, optimal_yd = new_xd, new_yd
                 last_update += 1
                 print(f"Best Cost: {optimal_cost}")
-            if i-last_update > early_exit_threshold: break
+
+            # Exit once min threshold is completed
+            #if i-last_update > early_exit_threshold:
+            #    break
+
+        best = min(scores.values(), key=lambda s: s['cost'])
+        optimal_xd, optimal_yd = best['x'], best['y']
+
+    # publish the options for points
+    if targets_pub:
+        render_targets_points(targets_pub, scores, best)
     return optimal_xd, optimal_yd
 
 def pure_pursuit(dog_xy, target_xy, lookahead=2.0, step=0.5):

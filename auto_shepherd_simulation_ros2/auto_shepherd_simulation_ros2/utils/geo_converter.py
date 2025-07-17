@@ -93,7 +93,7 @@ def load_coords_from_yaml(yaml_file_path: str) -> List[Tuple[float, float]]:
             if 'latitude' in item and 'longitude' in item:
                 coords.append((float(item['latitude']), float(item['longitude'])))
         return coords
-        
+
 
 if __name__ == "__main__":
     # Example for the path you previously mentioned:

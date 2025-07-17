@@ -14,7 +14,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from auto_shepherd_simulation_ros2.sheep_simulation.simulation import Simulation
 from auto_shepherd_simulation_ros2.utils.geo_converter import MapConverter, load_coords_from_yaml
 
-class DogControlSimulator(Node):
+class SheepSimulator(Node):
     def __init__(self):
         super().__init__('dog_control_simulator')
 
@@ -25,6 +25,10 @@ class DogControlSimulator(Node):
         self.dog_state   = None
         self.dog_command = None  # Store the latest dog command
         self.simulation  = None  # build later when we get data
+        self.field_boundary = None  # build later when we get data
+        self.map_converter = None  # build later when we get data
+        self.simulation = None
+        self.num_sheep = None
 
         # Create QoS profile
         qos_profile = QoSProfile(
@@ -48,15 +52,36 @@ class DogControlSimulator(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/simulation_markers', qos_profile)
 
         # Load the field boundaries
-        yaml_map_file_path = "/home/ros/map/map1.yaml"
-        self._load_map(yaml_map_file_path)
-        #TODO: self.create_subscription(String, '/field/boundaries', self._load_map, qos_profile)
+        self.create_subscription(Path, "/field/gps_fence/path", self._gps_fence_cb, self.get_qos())
+        self.create_subscription(Path, "/field/fence/path", self._fence_cb, self.get_qos())
+
+        # Start the simulator
+        self.start_simulation()
+
+    def start_simulation(self):
+        print('Sim init attempt')
+
+        # Exit if data not ready
+        if not self.field_boundary: return
+        if not self.map_converter: return
+
+        # Exit if already started
+        if self.simulation: return
+
+        print('Sim init')
 
         # Start Simulation
         self.simulation = Simulation(self.field_boundary, 800, 600, sheep_states=None, sheepdog_state=None, spawn_random=False)
         self.dt = 0.05
         self.sim_step_timer = self.create_timer(self.dt, self.run_sim_step, callback_group=RCG())
         print('Dog Control Simulator Initialised')
+
+        # Initialise the sheep
+        if self.num_sheep:
+            self.simulation.num_sheep = self.num_sheep
+            self.simulation.sheep_list = []
+            self.simulation._initialize_sheep(None, spawn_random=True)
+            self.get_logger().info(f"Initialised {self.num_sheep} sheep.")
 
 
     def get_qos(self):
@@ -67,16 +92,21 @@ class DogControlSimulator(Node):
         )
         return qos_profile
 
-    def _load_map(self, yaml_map_file_path):
-        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
-        field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
-
-        # Create Map Bounding Box & Convert All Coords
+    def _gps_fence_cb(self, msg):
+        print('GPS Fence cb')
+        field_coords_latlon = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
         self.map_converter = MapConverter(field_coords_latlon)
-        map_data = self.map_converter.get_map_data()
-        self.field_boundary = map_data['map_coords_xy_meters']
 
+        # Start the simulator
+        self.start_simulation()
 
+    def _fence_cb(self, msg):
+        print('Fence cb')
+        field_coords = [(p.pose.position.y, p.pose.position.x) for p in msg.poses]
+        self.field_boundary = field_coords
+
+        # Start the simulator
+        self.start_simulation()
 
     def _dog_command_cb(self, msg):
         """Callback for dog command messages"""
@@ -98,6 +128,13 @@ class DogControlSimulator(Node):
         self.get_logger().info(f"Callback detected for dog now at x:{msg.pose.position.x}, y:{msg.pose.position.y}.")
 
     def _sheep_randomise_cb(self, msg):
+        print('Sheep init cb')
+
+        # If map data not available yet, skip
+        if not self.simulation:
+            self.num_sheep = msg.data
+            return
+
         self.simulation.num_sheep = msg.data
         self.simulation.sheep_list = []
         self.simulation._initialize_sheep(None, spawn_random=True)
@@ -105,14 +142,18 @@ class DogControlSimulator(Node):
 
     def _sheep_cb(self, msg):
 
+        # Skip frames if not needed
         self.frame += 1
         #if not str(self.frame).endswith('0'): return
+
+        # If map data not available yet, skip
+        if not self.map_converter: return
 
         # Get current timestep
         print('_______________')
         self.sheep_poses = {}
         for sheep in msg.poses:
-            
+
             # Create sheep creator
             name = sheep.header.frame_id
             if name not in self.sheep_poses:
@@ -287,7 +328,7 @@ class DogControlSimulator(Node):
 
 def main():
     rclpy.init()
-    node = DogControlSimulator()
+    node = SheepSimulator()
     rclpy.spin(node)
     rclpy.shutdown()
 

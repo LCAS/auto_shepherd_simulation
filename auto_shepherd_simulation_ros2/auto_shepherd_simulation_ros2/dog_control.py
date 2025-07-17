@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from nav_msgs.msg import Path
 from visualization_msgs.msg import MarkerArray
 
-from auto_shepherd_simulation_ros2.tmpDogSim.dog_control_lib import find_best_dog_position, pure_pursuit
+from auto_shepherd_simulation_ros2.control.dog_control_lib import find_best_dog_position, pure_pursuit
 from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
 
 class DogController(Node):
@@ -22,37 +22,18 @@ class DogController(Node):
         self.create_subscription(Path, '/sheep/poses_sim', self._sheep_cb, 10)
         self.create_subscription(PoseStamped, '/sheep/goal', self._goal_cb, self.get_qos())
         self.marker_pub = self.create_publisher(MarkerArray, "/dbscan_hulls", 10)
+        self.targets_pub = self.create_publisher(MarkerArray, "/dog/options", 10)
+        self.create_subscription(Path, "/field/fence/path", self._fence_cb, self.get_qos())
 
         # state caches ----------------------------------------------------
         self.dog_xy   = None              # (x, y)
         self._planned_dog_xy = None       # (x, y) of the last planned dog position
         self.sheep_xy = None              # Nx2 array
         self.goal_xy  = None              # (x, y)
+        self.field_boundary = None
 
         # control timer ----------------------------------------------------
         self.timer = self.create_timer(0.1, self._control_step)
-
-        yaml_map_file_path = "/home/ros/map/map1.yaml"
-        print(f"Attempting to load field coordinates from: {yaml_map_file_path}")
-        try:
-            field_coords_latlon = load_coords_from_yaml(yaml_map_file_path)
-            print(f"Successfully loaded {len(field_coords_latlon)} coordinates from YAML.")
-        except (FileNotFoundError, ValueError) as e:
-            print(f"Failed to load coordinates from YAML: {e}")
-            print("Please ensure the file path is correct and the YAML format matches 'field_boundary: - latitude: X - longitude: Y'.")
-            print("Exiting example.")
-            exit(1) # Exit if cannot load map data
-
-
-        # Create Map Bounding Box & Convert All Coords
-        try:
-            self.map_converter = MapConverter(field_coords_latlon)
-            map_data = self.map_converter.get_map_data()
-            self.field_boundary = map_data['map_coords_xy_meters']
-
-        except ValueError as e:
-            print(f"Error during map conversion: {e}")
-            self.map_converter = None # Ensure map_converter is not set if initialization failed
 
 
     def get_qos(self):
@@ -65,6 +46,9 @@ class DogController(Node):
 
 
     # ------------ message callbacks -------------------------------------
+    def _fence_cb(self, msg: Path):
+        self.field_boundary = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
+
     def _dog_cb(self, msg: PoseStamped):
         self.dog_xy = (msg.pose.position.x, msg.pose.position.y)
 
@@ -124,13 +108,14 @@ class DogController(Node):
 
     # ------------ closed-loop control -----------------------------------
     def _control_step(self):
-        print("_control_step")
 
-        # make sure we have the three inputs we need
-        if self.sheep_xy is None or self.goal_xy is None:
+        # make sure we have the inputs we need
+        opt = [self.sheep_xy, self.goal_xy, self.field_boundary]
+        if any(o is None for o in opt):
             return
-        if self.dog_xy is None and self._planned_dog_xy is None:
-            return   # still waiting for the very first dog pose
+        opt = [self.dog_xy, self._planned_dog_xy]
+        if all(o is None for o in opt):
+            return
 
         # ---------------------------------------------
         # choose the starting point for optimisation
@@ -144,7 +129,7 @@ class DogController(Node):
         xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
         xc, yc = self.goal_xy
 
-        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary, boundary_pub=self.marker_pub)
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary, boundary_pub=self.marker_pub, targets_pub=self.targets_pub)
         print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
 
         ps = PoseStamped()

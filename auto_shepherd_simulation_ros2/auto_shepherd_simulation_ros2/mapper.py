@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
+from std_msgs.msg import Header
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PolygonStamped, PoseStamped, Quaternion, Point32, TransformStamped
 
@@ -19,17 +20,19 @@ class MapperNode(Node):
         #TODO: Fences should not be published from here, they should be published from sim_data_loader.py instead
 
         # Configure publishers
-        self.publisher_path_ = self.create_publisher(Path, 'FieldBoundaryPath', self.get_qos())
-        self.publisher_polygon_ = self.create_publisher(PolygonStamped, 'field', self.get_qos())
+        self.gps_path_pub = self.create_publisher(Path, '/field/gps_fence/path', self.get_qos())
+        self.field_path_pub = self.create_publisher(Path, '/field/fence/path', self.get_qos())
+        self.gps_polygon_pub = self.create_publisher(PolygonStamped, '/field/gps_fence/polygon', self.get_qos())
+        self.field_polygon_pub = self.create_publisher(PolygonStamped, '/field/fence/polygon', self.get_qos())
         self.static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
         # Load raw (lat, lon) coordinates
         map_file_path = '/home/ros/map/map1.yaml'
         self.get_logger().info(f"Attempting to load map for MapperNode from: {map_file_path}")
-        raw_latlon_coords = load_coords_from_yaml(map_file_path)
+        self.raw_latlon_coords = load_coords_from_yaml(map_file_path)
 
         # Initialize the MapConverter
-        self.map_converter = MapConverter(raw_latlon_coords)
+        self.map_converter = MapConverter(self.raw_latlon_coords)
         map_data = self.map_converter.get_map_data()
 
         # Store map origin (in UTM)
@@ -41,13 +44,13 @@ class MapperNode(Node):
         self.get_logger().info(f"Map converted. Origin (UTM X, Y): ({self.origin_utm_x:.3f}, {self.origin_utm_y:.3f})")
 
         # Create messages for the path
-        self.path_poses = self._create_path_poses(self.relative_xy_meters)
-        self.polygon_points = self._create_polygon_points(self.relative_xy_meters)
+        self.path_gps = self.create_path_poses(self.raw_latlon_coords)
+        self.path_poses = self.create_path_poses(self.relative_xy_meters)
+        self.polygon_gps = self.create_polygon_points(self.raw_latlon_coords)
+        self.polygon_points = self.create_polygon_points(self.relative_xy_meters)
 
         # Publish the Path, PolygonStamped, and static transform messages
-        self.publish_path_once()
-        self.publish_polygon_once()
-        self.publish_static_transform()
+        self.publish_msgs()
         self.get_logger().info("Map published once as Path and Polygon. Static transform published. Node will now spin indefinitely.")
 
     def get_qos(self):
@@ -58,7 +61,7 @@ class MapperNode(Node):
         )
         return qos_profile
 
-    def _create_path_poses(self, xy_meters: List[Tuple[float, float]]) -> List[PoseStamped]:
+    def create_path_poses(self, xy_meters: List[Tuple[float, float]]) -> List[PoseStamped]:
         """
         Helper to create a list of PoseStamped messages from relative X, Y meter coordinates.
         These poses are in the 'field_frame', which will be offset by the map's UTM origin.
@@ -90,15 +93,15 @@ class MapperNode(Node):
             poses.append(closed_loop_pose)
         return poses
 
-    def _create_polygon_points(self, xy_meters: List[Tuple[float, float]]) -> List[Point32]:
+    def create_polygon_points(self, xy_meters: List[Tuple[float, float]]) -> List[Point32]:
         """
         Helper to create a list of Point32 messages for PolygonStamped.
         """
         points = []
         for x_m, y_m in xy_meters:
             p32 = Point32()
-            p32.x = x_m
-            p32.y = y_m
+            p32.x = y_m
+            p32.y = x_m
             p32.z = 0.0 # Assuming 2D polygon
             points.append(p32)
 
@@ -112,38 +115,41 @@ class MapperNode(Node):
             points.append(first_point)
         return points
 
-    def publish_path_once(self):
-        """Publishes the Path message containing the field boundary."""
-        if not self.path_poses:
-            self.get_logger().warn("No poses to publish for Path. Skipping publication.")
-            return
+    def header(self, frame):
+        header = Header()
+        header.stamp = self.get_clock().now().to_msg()
+        header.frame_id = frame
+        return header
 
-        path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map' # The Path itself is defined in the 'map' frame (absolute)
+    def publish_msgs(self):
 
-        path_msg.poses = self.path_poses
+        # Pubilsh Path (metric)
+        msg = Path()
+        msg.header = self.header(frame='map')
+        msg.poses = self.path_poses
+        self.field_path_pub.publish(msg) #BROWN
 
-        self.publisher_path_.publish(path_msg)
-        self.get_logger().info(f'Published FieldBoundaryPath with {len(path_msg.poses)} poses (once, latched).')
+        # Pubilsh Path (gps)
+        msg = Path()
+        msg.header = self.header(frame='world')
+        msg.poses = self.path_gps
+        self.gps_path_pub.publish(msg) #GREEN
 
-    def publish_polygon_once(self):
-        """Publishes the PolygonStamped message containing the field boundary."""
-        if not self.polygon_points:
-            self.get_logger().warn("No points to publish for PolygonStamped. Skipping publication.")
-            return
+        # Pubilsh Polygon (metric)
+        msg = PolygonStamped()
+        msg.header = self.header(frame='map')
+        msg.polygon.points = self.polygon_points
+        self.field_polygon_pub.publish(msg) #ORANGE
 
-        polygon_msg = PolygonStamped()
-        polygon_msg.header.stamp = self.get_clock().now().to_msg()
-        # The PolygonStamped is in 'field_frame' because its points are relative to that origin
-        polygon_msg.header.frame_id = 'field_frame'
-        polygon_msg.polygon.points = self.polygon_points
+        # Publish Polygon (gps)
+        msg = PolygonStamped()
+        msg.header = self.header(frame='world')
+        msg.polygon.points = self.polygon_gps
+        self.gps_polygon_pub.publish(msg) #BLUE
 
-        self.publisher_polygon_.publish(polygon_msg)
-        self.get_logger().info(f'Published PolygonStamped with {len(polygon_msg.polygon.points)} points (once, latched).')
+        self.get_logger().info(f'Published Field Boundary with {len(self.path_poses)}.')
 
-    def publish_static_transform(self):
-        """Publishes the static transform from 'map' to 'field_frame'."""
+        # Publish static transform
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'
