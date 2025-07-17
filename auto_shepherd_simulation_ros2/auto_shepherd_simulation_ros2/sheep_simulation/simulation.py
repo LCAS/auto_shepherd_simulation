@@ -303,7 +303,6 @@ class Game:
         self.LIGHTGREEN = (40,160,40)
 
         # Load map configuration
-        # map_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'configs', 'map', 'map1.yaml')
         map_file = '/home/ros/map/map1.yaml'
         field_boundary = load_map_config(map_file)
 

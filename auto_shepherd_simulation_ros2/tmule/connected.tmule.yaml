@@ -18,13 +18,16 @@ init_cmd: |
 
 windows:
 
-  - name: system
-    panes:
-      - ros2 run auto_shepherd_simulation_ros2 dog_control_simulator.py
-      - ros2 run auto_shepherd_simulation_ros2 dog_control.py
-
   - name: outputs
     panes:
       - rviz2
 
+  - name: system
+    panes:
+      - ros2 run auto_shepherd_simulation_ros2 sheep_simulator.py
+      - ros2 run auto_shepherd_simulation_ros2 dog_control.py
+
+  - name: inputs
+    panes: #TODO: Remove this once we have drone injected working
+      - ros2 run auto_shepherd_simulation_ros2 mapper.py
 
