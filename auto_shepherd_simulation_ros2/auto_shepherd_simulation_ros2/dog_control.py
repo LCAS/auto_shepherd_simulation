@@ -1,0 +1,154 @@
+import numpy as np
+import math
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, HistoryPolicy
+
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from nav_msgs.msg import Path
+from visualization_msgs.msg import MarkerArray
+
+from auto_shepherd_simulation_ros2.control.dog_control_lib import find_best_dog_position, pure_pursuit
+from auto_shepherd_simulation_ros2.utils.geo_converter import load_coords_from_yaml, MapConverter
+
+class DogController(Node):
+    def __init__(self):
+        super().__init__('dog_controller')
+
+        # publishers / subscribers ---------------------------------------
+        self.cmd_pub = self.create_publisher(PoseStamped, '/dog/command', 10)
+        self.create_subscription(PoseStamped, '/dog/pose', self._dog_cb, self.get_qos())
+        self.create_subscription(Path, '/sheep/poses_sim', self._sheep_cb, 10)
+        self.create_subscription(PoseStamped, '/sheep/goal', self._goal_cb, self.get_qos())
+        self.marker_pub = self.create_publisher(MarkerArray, "/dbscan_hulls", 10)
+        self.targets_pub = self.create_publisher(MarkerArray, "/dog/options", 10)
+        self.create_subscription(Path, "/field/fence/path", self._fence_cb, self.get_qos())
+
+        # state caches ----------------------------------------------------
+        self.dog_xy   = None              # (x, y)
+        self._planned_dog_xy = None       # (x, y) of the last planned dog position
+        self.sheep_xy = None              # Nx2 array
+        self.goal_xy  = None              # (x, y)
+        self.field_boundary = None
+
+        # control timer ----------------------------------------------------
+        self.timer = self.create_timer(0.1, self._control_step)
+
+
+    def get_qos(self):
+        qos_profile = QoSProfile(
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        return qos_profile
+
+
+    # ------------ message callbacks -------------------------------------
+    def _fence_cb(self, msg: Path):
+        self.field_boundary = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
+
+    def _dog_cb(self, msg: PoseStamped):
+        self.dog_xy = (msg.pose.position.x, msg.pose.position.y)
+
+    def _sheep_cb(self, msg: Path):
+        self.sheep_xy = np.array(
+            [[p.pose.position.x, p.pose.position.y] for p in msg.poses])
+
+    def _goal_cb(self, msg: PoseStamped):
+        self.goal_xy = (msg.pose.position.x, msg.pose.position.y)
+
+    def _init_boundary_follow(self):
+        pts   = np.array(self.field_boundary)
+        dog_x, dog_y = self.dog_xy            # latest live pose
+        # distance to every vertex
+        dists = np.hypot(pts[:,0]-dog_x, pts[:,1]-dog_y)
+        self.wp_index = int(dists.argmin())   # closest vertex
+        self.wp_index_init = int(dists.argmin())
+        # choose direction (CW vs CCW) by, e.g., lowest steering angle
+        self.wp_dir   = +1                    # +1 = CCW, –1 = CW
+        self.lap_done = False
+        vx, vy = pts[self.wp_index]
+        self.get_logger().info(
+            f"Starting boundary-follow at vertex {self.wp_index} "
+            f"({vx:.2f}, {vy:.2f})"
+        )
+
+    def _boundary_follow_step(self):
+        LOOKAHEAD = 2.0      # metres
+        STEP = 1.0
+        LAP_THRESH = 3.0     # metres to re-hit wp[0] and finish
+
+        if self.lap_done or self.field_boundary is None:
+            return None, None
+
+        dog_x, dog_y = (self._planned_dog_xy
+                    if self._planned_dog_xy is not None
+                    else self.dog_xy)
+
+        # ---------- 1. choose look-ahead target ----------------------------
+        while True:
+            tgt = self.field_boundary[self.wp_index]
+            d   = np.hypot(tgt[0]-dog_x, tgt[1]-dog_y)
+            if d > LOOKAHEAD:
+                break                              # keep this wp
+            # reached => advance along polygon
+            self.wp_index = (self.wp_index + self.wp_dir) % len(self.field_boundary)
+
+            # lap-complete test: wrapped around & close to start
+            if self.wp_index == self.wp_index_init and d < LAP_THRESH:
+                self.lap_done = True
+                self.get_logger().info("Boundary lap completed!")
+                return dog_x, dog_y
+
+        # ---------- 2. call path controller --------------------------------
+        xd_opt, yd_opt, _ = pure_pursuit((dog_x, dog_y), tgt, LOOKAHEAD, step=STEP)
+        return xd_opt, yd_opt
+
+    # ------------ closed-loop control -----------------------------------
+    def _control_step(self):
+
+        # make sure we have the inputs we need
+        opt = [self.sheep_xy, self.goal_xy, self.field_boundary]
+        if any(o is None for o in opt):
+            return
+        opt = [self.dog_xy, self._planned_dog_xy]
+        if all(o is None for o in opt):
+            return
+
+        # ---------------------------------------------
+        # choose the starting point for optimisation
+        # ---------------------------------------------
+        if self._planned_dog_xy is None:
+            xd_start, yd_start = self.dog_xy          # FIRST call → live pose
+            self._init_boundary_follow()
+        else:
+            xd_start, yd_start = self._planned_dog_xy # LATER calls → last plan
+
+        xs, ys = self.sheep_xy[:, 0], self.sheep_xy[:, 1]
+        xc, yc = self.goal_xy
+
+        xd_opt, yd_opt = find_best_dog_position(xs, ys, xd_start, yd_start, xc, yc, self.field_boundary, boundary_pub=self.marker_pub, targets_pub=self.targets_pub)
+        print(f"Optimised dog position: ({xd_opt:.2f}, {yd_opt:.2f})")
+
+        ps = PoseStamped()
+        ps.header.stamp = self.get_clock().now().to_msg()
+        ps.header.frame_id = "field_frame"        # or any frame you prefer
+        ps.pose.position = Point(x=float(xd_opt), y=float(yd_opt), z=0.0)
+        ps.pose.orientation = Quaternion(w=1.0)  # identity; adjust if needed
+        self.cmd_pub.publish(ps)
+        self.get_logger().debug(f'Cmd ({xd_opt:.2f}, {yd_opt:.2f})')
+
+        self._planned_dog_xy = (xd_opt, yd_opt)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DogController()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

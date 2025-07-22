@@ -4,6 +4,9 @@
 COMPOSE_FILE="docker-compose.yml"
 SERVICE_NAME="auto_shepherd_simulation_ros2_humble"
 
+command -v xhost >/dev/null && xhost +local:docker
+#xhost +local:docker
+
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     HOST_DISPLAY_VAR="$DISPLAY"
 elif [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "msys"* || "$OSTYPE" == "win32"* ]]; then
@@ -27,10 +30,24 @@ echo "Docker Compose cleanup completed."
 # --- Run the Docker Compose service interactively ---
 echo "Starting Docker Compose service '${SERVICE_NAME}' in interactive mode..."
 
-docker compose -f "${COMPOSE_FILE}" run \
-    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
-    -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
-    "${DOCKER_RUN_ARGS[@]}" \
-    "${SERVICE_NAME}" bash
+docker compose -f "${COMPOSE_FILE}" up -d "${SERVICE_NAME}"
+#docker compose -f "${COMPOSE_FILE}" run \
+#    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
+#    -e "HOST_DISPLAY_VAR=${HOST_DISPLAY_VAR}" \
+#    -e QT_X11_NO_MITSHM=1 \
+#    "${DOCKER_RUN_ARGS[@]}" \
+#    "${SERVICE_NAME}" \
+#    bash
 
+# Check if the container started successfully
+docker ps --filter "name=${SERVICE_NAME}" --filter "status=running" | grep ${SERVICE_NAME} > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Container failed to start!"
+    docker ps -a
+    docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found for container."
+    exit 1
+fi
+echo "Container started successfully."
+docker ps -a
+docker logs auto_shepherd_simulation_ros2_humble || echo "No logs found for container."
 echo "Docker container session ended."

@@ -1,4 +1,4 @@
-# auto_shepherd_simulation
+# auto_shepherd_simulation_ros2
 1. create repo from template
 2. git clone the new repo
 3. cd into the bash folder

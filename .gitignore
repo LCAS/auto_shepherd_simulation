@@ -75,3 +75,6 @@ crashlytics-build.properties
 
 *.swp
 *~
+
+*.pyc
+*__pycache__*

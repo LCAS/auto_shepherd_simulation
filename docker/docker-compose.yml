@@ -3,6 +3,7 @@ networks:
 
 services:
   auto_shepherd_simulation_ros2_humble:
+    container_name: auto_shepherd_simulation_ros2_humble  # <- included for .git action identification
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,15 +21,15 @@ services:
 
     # — Bind‑mount each git sub‑module into the workspace ————————————
     volumes:
-      - ../ros2_package:/home/ros/base_ws/src/ros2_package:rw
+      - ../auto_shepherd_simulation_ros2:/home/ros/base_ws/src/auto_shepherd_simulation_ros2:rw
 
       # Bash Scripts
       - ../bash_scripts/container:/home/ros/bash_scripts:rw
 
       # enable mount for gui applications
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-
-      - ../rviz_config:/home/ros/.rviz2:rw
+      - ../configs/rviz:/home/ros/.rviz2:rw
+      - ../configs/map:/home/ros/map:rw
 
     environment:
       - BASE_WS=/home/ros/base_ws
