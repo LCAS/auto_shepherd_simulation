@@ -41,10 +41,13 @@ namespace Controller
         private bool m_IsRun;
 
         private bool m_IsMoving;
+        private float m_SpeedMultiplier = 1f;
 
         public Vector2 Axis => m_Axis;
         public Vector3 Target => m_Target;
         public bool IsRun => m_IsRun;
+
+        public float SpeedMultiplier => m_SpeedMultiplier;
 
         private void OnValidate()
         {
@@ -62,6 +65,7 @@ namespace Controller
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
             m_Animation = new AnimationHandler(m_Animator, m_VerticalID, m_StateID);
+            m_Movement.SetSpeedMultiplier(m_SpeedMultiplier);
         }
 
         private void Update()
@@ -91,6 +95,12 @@ namespace Controller
                 m_Axis = Vector3.ClampMagnitude(m_Axis, 1f);
                 m_IsMoving = true;
             }
+        }
+
+        public void SetSpeedMultiplier(float speedMultiplier)
+        {
+            m_SpeedMultiplier = Mathf.Max(0.01f, speedMultiplier);
+            m_Movement?.SetSpeedMultiplier(m_SpeedMultiplier);
         }
 
         private void OnControllerColliderHit(ControllerColliderHit hit)
@@ -127,6 +137,7 @@ namespace Controller
             private float m_WalkSpeed;
             private float m_RunSpeed;
             private float m_RotateSpeed;
+            private float m_SpeedMultiplier = 1f;
 
             private Space m_Space;
 
@@ -160,6 +171,11 @@ namespace Controller
                 m_RotateSpeed = rotateSpeed;
 
                 m_Space = space;
+            }
+
+            public void SetSpeedMultiplier(float speedMultiplier)
+            {
+                m_SpeedMultiplier = Mathf.Max(0.01f, speedMultiplier);
             }
 
             public void SetSurface(in Vector3 normal)
@@ -207,7 +223,8 @@ namespace Controller
 
             private void Displace(float deltaTime, in Vector3 movement, bool isRun)
             {
-                Vector3 displacement = (isRun ? m_RunSpeed : m_WalkSpeed) * movement;
+                float baseSpeed = isRun ? m_RunSpeed : m_WalkSpeed;
+                Vector3 displacement = (baseSpeed * m_SpeedMultiplier) * movement;
                 displacement += m_GravityAcelleration;
                 displacement *= deltaTime;
 
