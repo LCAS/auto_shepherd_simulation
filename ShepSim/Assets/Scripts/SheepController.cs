@@ -27,8 +27,6 @@ namespace Ursaanimation.CubicFarmAnimals
         private const float STAND_SLOW_TIME = 3f;
 
         private const float OBSTACLE_AVOID_FACTOR = 0.1f;
-        private const float FENCE_AVOID_RADIUS = 3f;
-        private const float FENCE_AVOID_WEIGHT = 3f;
 
         private const float PARAM_VARIANCE = 0.25f;
         private const float WEIGHT_VARIANCE = 0.30f;
@@ -44,6 +42,11 @@ namespace Ursaanimation.CubicFarmAnimals
         [SerializeField] private float dogRepulsionRadius = 20f;
         [SerializeField] private float dogRepulsionWeight = 4.0f;
 
+        [Header("Fence Repulsion")]
+        [SerializeField] private float fenceRepulsionRadius = 6f;
+        [SerializeField] private float fenceRepulsionWeight = 6f;
+        [SerializeField] private float fenceRepulsionSpeedBoost = 1.2f;
+
         [Header("Motion")]
         [SerializeField] private float groundPlaneY = 0f;
         [SerializeField] private float visualForwardOffsetDegrees = 0f;
@@ -51,6 +54,8 @@ namespace Ursaanimation.CubicFarmAnimals
         [Header("Fence Collision")]
         [SerializeField] private float bodyCollisionRadius = 0.35f;
         [SerializeField] private float fenceStopPadding = 0.08f;
+        [SerializeField] private float fenceRepelStep = 0.35f;
+        [SerializeField, Range(0f, 1f)] private float fenceSlideFactor = 0.7f;
 
         private float neighbourRadius;
         private float sepSideRadius;
@@ -224,9 +229,34 @@ namespace Ursaanimation.CubicFarmAnimals
                 if (hit.collider != null && hit.collider.CompareTag("Fence"))
                 {
                     float stopDistance = Mathf.Max(0f, hit.distance - fenceStopPadding);
-                    Vector3 clamped = currentPos + direction * stopDistance;
-                    clamped.y = groundPlaneY;
-                    return clamped;
+                    Vector3 approach = currentPos + direction * stopDistance;
+
+                    Vector3 normal = hit.normal;
+                    normal.y = 0f;
+                    if (normal.sqrMagnitude < 0.0001f)
+                    {
+                        normal = (approach - hit.point);
+                        normal.y = 0f;
+                    }
+                    if (normal.sqrMagnitude < 0.0001f)
+                    {
+                        normal = -direction;
+                    }
+                    normal.Normalize();
+
+                    Vector3 slide = Vector3.ProjectOnPlane(planarMove, normal) * Mathf.Clamp01(fenceSlideFactor);
+                    Vector3 repel = normal * Mathf.Max(0.01f, fenceRepelStep);
+
+                    Vector3 redirected = approach + slide + repel;
+                    redirected.y = groundPlaneY;
+
+                    // Bias velocity away from fence so steering reacts as repulsion instead of repeated stop.
+                    float currentSpeed = _velocity.magnitude;
+                    Vector3 awayVelocity = normal * Mathf.Max(AMBLER_SPEED, currentSpeed * 0.8f);
+                    _velocity = Vector3.Lerp(_velocity, awayVelocity, 0.45f);
+                    _velocity.y = 0f;
+
+                    return redirected;
                 }
             }
 
@@ -297,12 +327,14 @@ namespace Ursaanimation.CubicFarmAnimals
             Vector3 cohesion = Vector3.zero;
             Vector3 fenceAvoid = Vector3.zero;
             int neighbourCount = 0;
+            float maxFenceThreat = 0f;
 
-            Collider[] fences = Physics.OverlapSphere(pos, FENCE_AVOID_RADIUS);
+            float fenceRadius = Mathf.Max(0.1f, fenceRepulsionRadius);
+            Collider[] fences = Physics.OverlapSphere(pos, fenceRadius);
             for (int i = 0; i < fences.Length; i++)
             {
                 Collider col = fences[i];
-                if (col == null || !col.CompareTag("Fence"))
+                if (col == null || !IsFenceCollider(col))
                 {
                     continue;
                 }
@@ -315,9 +347,16 @@ namespace Ursaanimation.CubicFarmAnimals
                     continue;
                 }
 
-                float strength = Mathf.Clamp01((FENCE_AVOID_RADIUS - dist) / FENCE_AVOID_RADIUS);
+                float strength = Mathf.Clamp01(1f - (dist / fenceRadius));
                 strength *= strength;
-                fenceAvoid += toFence.normalized * strength * FENCE_AVOID_WEIGHT;
+                maxFenceThreat = Mathf.Max(maxFenceThreat, strength);
+                fenceAvoid += toFence.normalized * strength * fenceRepulsionWeight;
+            }
+
+            if (maxFenceThreat > 0f)
+            {
+                float speedBoost = Mathf.Lerp(1f, Mathf.Max(1f, fenceRepulsionSpeedBoost), maxFenceThreat);
+                _velocity = Vector3.ClampMagnitude(_velocity, AMBLER_SPEED * speedBoost);
             }
 
             float obstacleRadius = neighbourRadius * OBSTACLE_AVOID_FACTOR;
@@ -381,6 +420,31 @@ namespace Ursaanimation.CubicFarmAnimals
                 dogAvoid;
 
             return Vector3.ClampMagnitude(steer, maxForce);
+        }
+
+        private static bool IsFenceCollider(Collider col)
+        {
+            if (col == null)
+            {
+                return false;
+            }
+
+            if (col.CompareTag("Fence"))
+            {
+                return true;
+            }
+
+            Transform parent = col.transform.parent;
+            while (parent != null)
+            {
+                if (parent.CompareTag("Fence"))
+                {
+                    return true;
+                }
+                parent = parent.parent;
+            }
+
+            return false;
         }
 
         private Vector3 ComputeDogAvoidance(Vector3 pos)

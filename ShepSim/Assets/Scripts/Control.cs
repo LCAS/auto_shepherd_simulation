@@ -31,9 +31,11 @@ namespace Controller
         [SerializeField] private float arcWidthDegrees = 90f;
         [SerializeField] private float goalArrivalDistance = 12f;
         [SerializeField] private float goalApproachDogRadiusMultiplier = 1.85f;
-        [SerializeField] private float clusterJoinDistance = 6f;
+        [SerializeField] private float clusterJoinDistance = 4f;
+        [SerializeField] private int clusterMinCorePoints = 3;
         [SerializeField] private int minClusterSize = 1;
         [SerializeField] private float boundaryPadding = 1f;
+        [SerializeField] private float dogBoundaryInset = 1.2f;
 
         [Header("Cluster Switch Transition")]
         [SerializeField] private float clusterSwitchDetectionDistance = 5f;
@@ -244,7 +246,8 @@ namespace Controller
                 RenderChosenVisual(target);
             }
 
-            dogController.SetTarget(target);
+            Vector3 safeTarget = MakeReachableDogTarget(dogPosition, target);
+            dogController.SetTarget(safeTarget);
         }
 
         private void BeginClusterTransition(Vector3 dogPos, Vector3 oldCentroid, Vector3 newCentroid, Vector3 goalPosition)
@@ -382,11 +385,39 @@ namespace Controller
             }
 
             bool[] visited = new bool[count];
+            int[] clusterIds = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                clusterIds[i] = -1;
+            }
+
             float joinDistance = Mathf.Max(0.1f, clusterJoinDistance);
             float joinDistanceSqr = joinDistance * joinDistance;
+            int minCorePoints = Mathf.Max(1, clusterMinCorePoints);
 
-            Queue<int> queue = new Queue<int>();
+            List<int>[] neighbourIndices = new List<int>[count];
+            for (int i = 0; i < count; i++)
+            {
+                neighbourIndices[i] = new List<int>();
+            }
 
+            // Precompute neighbourhood graph in XZ plane.
+            for (int i = 0; i < count; i++)
+            {
+                neighbourIndices[i].Add(i);
+                for (int j = i + 1; j < count; j++)
+                {
+                    Vector3 delta = sheepPositions[j] - sheepPositions[i];
+                    delta.y = 0f;
+                    if (delta.sqrMagnitude <= joinDistanceSqr)
+                    {
+                        neighbourIndices[i].Add(j);
+                        neighbourIndices[j].Add(i);
+                    }
+                }
+            }
+
+            int clusterId = 0;
             for (int i = 0; i < count; i++)
             {
                 if (visited[i])
@@ -395,29 +426,55 @@ namespace Controller
                 }
 
                 visited[i] = true;
-                queue.Enqueue(i);
+
+                // Not a dense-enough seed; leave as noise/border candidate for now.
+                if (neighbourIndices[i].Count < minCorePoints)
+                {
+                    continue;
+                }
 
                 List<Vector3> cluster = new List<Vector3>();
+                Queue<int> seeds = new Queue<int>();
+                seeds.Enqueue(i);
 
-                while (queue.Count > 0)
+                while (seeds.Count > 0)
                 {
-                    int index = queue.Dequeue();
-                    Vector3 current = sheepPositions[index];
-                    cluster.Add(current);
-
-                    for (int j = 0; j < count; j++)
+                    int idx = seeds.Dequeue();
+                    if (clusterIds[idx] == clusterId)
                     {
-                        if (visited[j])
+                        continue;
+                    }
+
+                    if (clusterIds[idx] == -1)
+                    {
+                        clusterIds[idx] = clusterId;
+                        cluster.Add(sheepPositions[idx]);
+                    }
+
+                    bool isCore = neighbourIndices[idx].Count >= minCorePoints;
+                    if (!isCore)
+                    {
+                        continue;
+                    }
+
+                    List<int> neighbours = neighbourIndices[idx];
+                    for (int n = 0; n < neighbours.Count; n++)
+                    {
+                        int neighbourIndex = neighbours[n];
+
+                        if (!visited[neighbourIndex])
                         {
-                            continue;
+                            visited[neighbourIndex] = true;
+                            if (neighbourIndices[neighbourIndex].Count >= minCorePoints)
+                            {
+                                seeds.Enqueue(neighbourIndex);
+                            }
                         }
 
-                        Vector3 delta = sheepPositions[j] - current;
-                        delta.y = 0f;
-                        if (delta.sqrMagnitude <= joinDistanceSqr)
+                        if (clusterIds[neighbourIndex] == -1)
                         {
-                            visited[j] = true;
-                            queue.Enqueue(j);
+                            clusterIds[neighbourIndex] = clusterId;
+                            cluster.Add(sheepPositions[neighbourIndex]);
                         }
                     }
                 }
@@ -425,6 +482,17 @@ namespace Controller
                 if (cluster.Count > 0)
                 {
                     clusters.Add(cluster);
+                    clusterId++;
+                }
+            }
+
+            // If no dense clusters were found, keep sheep separated into tight singleton clusters.
+            if (clusters.Count == 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    List<Vector3> singleton = new List<Vector3>(1) { sheepPositions[i] };
+                    clusters.Add(singleton);
                 }
             }
 
@@ -484,15 +552,64 @@ namespace Controller
                 return;
             }
 
-            Vector3 first = fences[0].transform.position;
-            Vector3 min = first;
-            Vector3 max = first;
+            bool hasBounds = false;
+            Vector3 min = Vector3.zero;
+            Vector3 max = Vector3.zero;
 
-            for (int i = 1; i < fences.Length; i++)
+            for (int i = 0; i < fences.Length; i++)
             {
-                Vector3 p = fences[i].transform.position;
-                min = Vector3.Min(min, p);
-                max = Vector3.Max(max, p);
+                GameObject fence = fences[i];
+                if (fence == null)
+                {
+                    continue;
+                }
+
+                Collider[] cols = fence.GetComponentsInChildren<Collider>();
+                if (cols != null && cols.Length > 0)
+                {
+                    for (int c = 0; c < cols.Length; c++)
+                    {
+                        Collider col = cols[c];
+                        if (col == null)
+                        {
+                            continue;
+                        }
+
+                        Bounds b = col.bounds;
+                        if (!hasBounds)
+                        {
+                            min = b.min;
+                            max = b.max;
+                            hasBounds = true;
+                        }
+                        else
+                        {
+                            min = Vector3.Min(min, b.min);
+                            max = Vector3.Max(max, b.max);
+                        }
+                    }
+                }
+                else
+                {
+                    Vector3 p = fence.transform.position;
+                    if (!hasBounds)
+                    {
+                        min = p;
+                        max = p;
+                        hasBounds = true;
+                    }
+                    else
+                    {
+                        min = Vector3.Min(min, p);
+                        max = Vector3.Max(max, p);
+                    }
+                }
+            }
+
+            if (!hasBounds)
+            {
+                m_HasFieldBounds = false;
+                return;
             }
 
             min.x -= boundaryPadding;
@@ -622,7 +739,27 @@ namespace Controller
                 return true;
             }
 
-            return m_FieldBounds.Contains(point);
+            float inset = Mathf.Max(0f, dogBoundaryInset);
+            float minX = m_FieldBounds.min.x + inset;
+            float maxX = m_FieldBounds.max.x - inset;
+            float minZ = m_FieldBounds.min.z + inset;
+            float maxZ = m_FieldBounds.max.z - inset;
+
+            if (minX > maxX)
+            {
+                float mid = (m_FieldBounds.min.x + m_FieldBounds.max.x) * 0.5f;
+                minX = mid;
+                maxX = mid;
+            }
+
+            if (minZ > maxZ)
+            {
+                float mid = (m_FieldBounds.min.z + m_FieldBounds.max.z) * 0.5f;
+                minZ = mid;
+                maxZ = mid;
+            }
+
+            return point.x >= minX && point.x <= maxX && point.z >= minZ && point.z <= maxZ;
         }
 
         private Vector3 ClampToField(Vector3 point)
@@ -632,9 +769,84 @@ namespace Controller
                 return point;
             }
 
-            point.x = Mathf.Clamp(point.x, m_FieldBounds.min.x, m_FieldBounds.max.x);
-            point.z = Mathf.Clamp(point.z, m_FieldBounds.min.z, m_FieldBounds.max.z);
+            float inset = Mathf.Max(0f, dogBoundaryInset);
+            float minX = m_FieldBounds.min.x + inset;
+            float maxX = m_FieldBounds.max.x - inset;
+            float minZ = m_FieldBounds.min.z + inset;
+            float maxZ = m_FieldBounds.max.z - inset;
+
+            if (minX > maxX)
+            {
+                float mid = (m_FieldBounds.min.x + m_FieldBounds.max.x) * 0.5f;
+                minX = mid;
+                maxX = mid;
+            }
+
+            if (minZ > maxZ)
+            {
+                float mid = (m_FieldBounds.min.z + m_FieldBounds.max.z) * 0.5f;
+                minZ = mid;
+                maxZ = mid;
+            }
+
+            point.x = Mathf.Clamp(point.x, minX, maxX);
+            point.z = Mathf.Clamp(point.z, minZ, maxZ);
             return point;
+        }
+
+        private Vector3 MakeReachableDogTarget(Vector3 dogPosition, Vector3 desiredTarget)
+        {
+            Vector3 clamped = ClampToField(desiredTarget);
+            Vector3 from = dogPosition + Vector3.up * 0.2f;
+            Vector3 to = clamped + Vector3.up * 0.2f;
+            Vector3 ray = to - from;
+            float dist = ray.magnitude;
+
+            if (dist < 0.0001f)
+            {
+                clamped.y = dogPosition.y;
+                return clamped;
+            }
+
+            Vector3 dir = ray / dist;
+            if (Physics.Raycast(from, dir, out RaycastHit hit, dist, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider != null && IsFenceCollider(hit.collider))
+                {
+                    Vector3 fallback = hit.point - dir * Mathf.Max(0.4f, dogBoundaryInset * 0.5f);
+                    fallback = ClampToField(fallback);
+                    fallback.y = dogPosition.y;
+                    return fallback;
+                }
+            }
+
+            clamped.y = dogPosition.y;
+            return clamped;
+        }
+
+        private static bool IsFenceCollider(Collider collider)
+        {
+            if (collider == null)
+            {
+                return false;
+            }
+
+            if (collider.CompareTag("Fence"))
+            {
+                return true;
+            }
+
+            Transform parent = collider.transform.parent;
+            while (parent != null)
+            {
+                if (parent.CompareTag("Fence"))
+                {
+                    return true;
+                }
+                parent = parent.parent;
+            }
+
+            return false;
         }
 
         private void EnsureVisualPool(List<Transform> pool, int count, GameObject prefab, string baseName)
@@ -706,7 +918,24 @@ namespace Controller
         {
             int pointCount = Mathf.Max(3, boundaryRingPointCount);
             int ringCount = clusters != null ? clusters.Count : 0;
-            int neededMarkers = Mathf.Max(pointCount, ringCount * pointCount);
+
+            int neededMarkers = 0;
+            if (clusters != null)
+            {
+                for (int i = 0; i < clusters.Count; i++)
+                {
+                    List<Vector3> cluster = clusters[i];
+                    if (cluster == null || cluster.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    List<Vector3> hull = ComputeClusterHull(cluster);
+                    neededMarkers += Mathf.Max(hull.Count, pointCount);
+                }
+            }
+
+            neededMarkers = Mathf.Max(pointCount, neededMarkers);
             EnsureVisualPool(m_BoundaryVisuals, neededMarkers, boundaryPrefab, "Boundary");
 
             int markerIndex = 0;
@@ -718,10 +947,15 @@ namespace Controller
                     continue;
                 }
 
-                Vector3 centroid = ComputeCentroid(cluster);
-                float radius = GetFlockRadius(cluster, centroid);
+                List<Vector3> hull = ComputeClusterHull(cluster);
+                if (hull.Count < 2)
+                {
+                    continue;
+                }
 
-                for (int i = 0; i < pointCount && markerIndex < m_BoundaryVisuals.Count; i++, markerIndex++)
+                int clusterMarkerCount = Mathf.Max(pointCount, hull.Count);
+
+                for (int i = 0; i < clusterMarkerCount && markerIndex < m_BoundaryVisuals.Count; i++, markerIndex++)
                 {
                     Transform marker = m_BoundaryVisuals[markerIndex];
                     if (marker == null)
@@ -729,10 +963,8 @@ namespace Controller
                         continue;
                     }
 
-                    float t = (float)i / pointCount;
-                    float angle = t * Mathf.PI * 2f;
-                    Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
-                    Vector3 markerPosition = centroid + offset;
+                    float t = (float)i / clusterMarkerCount;
+                    Vector3 markerPosition = SampleHullPerimeter(hull, t);
                     markerPosition.y = 0f;
                     marker.position = markerPosition;
                     marker.gameObject.SetActive(true);
@@ -748,6 +980,140 @@ namespace Controller
                 }
                 marker.gameObject.SetActive(false);
             }
+        }
+
+        private List<Vector3> ComputeClusterHull(List<Vector3> points)
+        {
+            List<Vector2> uniquePoints = new List<Vector2>();
+            for (int i = 0; i < points.Count; i++)
+            {
+                Vector2 p = new Vector2(points[i].x, points[i].z);
+                bool exists = false;
+                for (int j = 0; j < uniquePoints.Count; j++)
+                {
+                    if ((uniquePoints[j] - p).sqrMagnitude < 0.0001f)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    uniquePoints.Add(p);
+                }
+            }
+
+            if (uniquePoints.Count == 0)
+            {
+                return new List<Vector3>();
+            }
+
+            if (uniquePoints.Count <= 2)
+            {
+                List<Vector3> simple = new List<Vector3>(uniquePoints.Count);
+                for (int i = 0; i < uniquePoints.Count; i++)
+                {
+                    simple.Add(new Vector3(uniquePoints[i].x, 0f, uniquePoints[i].y));
+                }
+                return simple;
+            }
+
+            // Monotonic chain convex hull in XZ plane
+            uniquePoints.Sort((a, b) =>
+            {
+                int xComp = a.x.CompareTo(b.x);
+                return xComp != 0 ? xComp : a.y.CompareTo(b.y);
+            });
+
+            List<Vector2> lower = new List<Vector2>();
+            for (int i = 0; i < uniquePoints.Count; i++)
+            {
+                Vector2 p = uniquePoints[i];
+                while (lower.Count >= 2 && Cross(lower[lower.Count - 2], lower[lower.Count - 1], p) <= 0f)
+                {
+                    lower.RemoveAt(lower.Count - 1);
+                }
+                lower.Add(p);
+            }
+
+            List<Vector2> upper = new List<Vector2>();
+            for (int i = uniquePoints.Count - 1; i >= 0; i--)
+            {
+                Vector2 p = uniquePoints[i];
+                while (upper.Count >= 2 && Cross(upper[upper.Count - 2], upper[upper.Count - 1], p) <= 0f)
+                {
+                    upper.RemoveAt(upper.Count - 1);
+                }
+                upper.Add(p);
+            }
+
+            if (lower.Count > 0) lower.RemoveAt(lower.Count - 1);
+            if (upper.Count > 0) upper.RemoveAt(upper.Count - 1);
+
+            List<Vector3> hull = new List<Vector3>(lower.Count + upper.Count);
+            for (int i = 0; i < lower.Count; i++)
+            {
+                hull.Add(new Vector3(lower[i].x, 0f, lower[i].y));
+            }
+            for (int i = 0; i < upper.Count; i++)
+            {
+                hull.Add(new Vector3(upper[i].x, 0f, upper[i].y));
+            }
+
+            return hull;
+        }
+
+        private static float Cross(Vector2 a, Vector2 b, Vector2 c)
+        {
+            Vector2 ab = b - a;
+            Vector2 ac = c - a;
+            return ab.x * ac.y - ab.y * ac.x;
+        }
+
+        private Vector3 SampleHullPerimeter(List<Vector3> hull, float t)
+        {
+            if (hull == null || hull.Count == 0)
+            {
+                return Vector3.zero;
+            }
+
+            if (hull.Count == 1)
+            {
+                return hull[0];
+            }
+
+            float perimeter = 0f;
+            for (int i = 0; i < hull.Count; i++)
+            {
+                Vector3 a = hull[i];
+                Vector3 b = hull[(i + 1) % hull.Count];
+                perimeter += Vector3.Distance(a, b);
+            }
+
+            if (perimeter < 0.0001f)
+            {
+                return hull[0];
+            }
+
+            float distanceAlong = Mathf.Clamp01(t) * perimeter;
+            float traveled = 0f;
+
+            for (int i = 0; i < hull.Count; i++)
+            {
+                Vector3 a = hull[i];
+                Vector3 b = hull[(i + 1) % hull.Count];
+                float edgeLen = Vector3.Distance(a, b);
+                if (traveled + edgeLen >= distanceAlong)
+                {
+                    float edgeT = (distanceAlong - traveled) / Mathf.Max(0.0001f, edgeLen);
+                    return Vector3.Lerp(a, b, edgeT);
+                }
+
+                traveled += edgeLen;
+            }
+
+            return hull[hull.Count - 1];
         }
 
         private void RenderCandidateVisuals(List<Vector3> candidatePositions)
