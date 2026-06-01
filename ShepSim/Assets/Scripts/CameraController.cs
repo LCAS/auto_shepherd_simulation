@@ -27,7 +27,11 @@ namespace Ursaanimation.CubicFarmAnimals
         [SerializeField] private Material groundTruthSheepMaterial;
         [SerializeField] private Material groundTruthDogMaterial;
         [SerializeField] private Color groundTruthBackgroundColor = Color.black;
+        [Header("Raw Capture")]
+        [SerializeField] private Camera rawCamera;
+        [SerializeField] private LayerMask rawNoDebugCullingMask = ~0;
         [SerializeField] private string rgbSuffix = "rgb";
+        [SerializeField] private string rawSuffix = "raw";
         [SerializeField] private string gtSuffix = "gt";
 
         private Camera _cam;
@@ -50,6 +54,11 @@ namespace Ursaanimation.CubicFarmAnimals
             if (groundTruthCamera == null)
             {
                 groundTruthCamera = _cam;
+            }
+
+            if (rawCamera == null)
+            {
+                rawCamera = _cam;
             }
         }
 
@@ -145,17 +154,19 @@ namespace Ursaanimation.CubicFarmAnimals
 
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
             string rgbPath = Path.Combine(folderPath, $"{stamp}_{rgbSuffix}.png");
+            string rawPath = Path.Combine(folderPath, $"{stamp}_{rawSuffix}.png");
             string gtPath = Path.Combine(folderPath, $"{stamp}_{gtSuffix}.png");
 
             try
             {
                 CaptureCameraToFile(_cam, rgbPath);
+                CaptureCameraWithCullingMaskToFile(rawCamera, rawNoDebugCullingMask, rawPath);
                 CaptureGroundTruthToFile(gtPath);
-                Debug.Log($"[CameraController] Captured image pair:\nRGB: {rgbPath}\nGT: {gtPath}");
+                Debug.Log($"[CameraController] Captured image set:\nRGB: {rgbPath}\nRAW: {rawPath}\nGT: {gtPath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[CameraController] Failed to capture image pair: {ex.Message}", this);
+                Debug.LogError($"[CameraController] Failed to capture image set: {ex.Message}", this);
             }
         }
 
@@ -387,6 +398,25 @@ namespace Ursaanimation.CubicFarmAnimals
 
                 Destroy(renderTexture);
                 Destroy(screenshot);
+            }
+        }
+
+        private void CaptureCameraWithCullingMaskToFile(Camera sourceCamera, LayerMask cullingMask, string filePath)
+        {
+            if (sourceCamera == null)
+            {
+                throw new InvalidOperationException("Source camera is null.");
+            }
+
+            int originalCullingMask = sourceCamera.cullingMask;
+            try
+            {
+                sourceCamera.cullingMask = cullingMask;
+                CaptureCameraToFile(sourceCamera, filePath);
+            }
+            finally
+            {
+                sourceCamera.cullingMask = originalCullingMask;
             }
         }
     }
