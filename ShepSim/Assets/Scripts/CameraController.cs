@@ -40,6 +40,8 @@ namespace Ursaanimation.CubicFarmAnimals
 
         private void Awake()
         {
+            EnsureHeightRangeIsValid();
+
             _cam = GetComponent<Camera>();
             if (_cam == null)
             {
@@ -60,6 +62,11 @@ namespace Ursaanimation.CubicFarmAnimals
             {
                 rawCamera = _cam;
             }
+        }
+
+        private void OnValidate()
+        {
+            EnsureHeightRangeIsValid();
         }
 
         private void LateUpdate()
@@ -116,6 +123,9 @@ namespace Ursaanimation.CubicFarmAnimals
                 nextPos.y = enforcedHeight;
             }
 
+            // Final safety clamp so zoom logic never drops below configured minimum.
+            nextPos.y = Mathf.Clamp(nextPos.y, minCameraHeight, maxCameraHeight);
+
             transform.position = nextPos;
 
             // Keep looking straight down (top-down orthographic-like view)
@@ -145,6 +155,19 @@ namespace Ursaanimation.CubicFarmAnimals
 
             float requiredHeight = Mathf.Max(heightFromDepth, heightFromWidth);
             return Mathf.Clamp(requiredHeight, minCameraHeight, maxCameraHeight);
+        }
+
+        private void EnsureHeightRangeIsValid()
+        {
+            if (maxCameraHeight < minCameraHeight)
+            {
+                maxCameraHeight = minCameraHeight;
+
+                if (enableDebugLogs)
+                {
+                    Debug.LogWarning("[CameraController] maxCameraHeight was lower than minCameraHeight. maxCameraHeight has been set to match minCameraHeight.", this);
+                }
+            }
         }
 
         private void CaptureRgbAndGroundTruthPair()
