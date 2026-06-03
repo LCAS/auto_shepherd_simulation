@@ -9,6 +9,7 @@ public class FenceManager : MonoBehaviour
 {
     private const string FenceTag = "Fence";
     private readonly Dictionary<int, float> _prefabSpacingCache = new Dictionary<int, float>();
+    private readonly List<Vector3> _cachedLocalBoundary = new List<Vector3>();
 
     public enum VerticalAxis
     {
@@ -174,6 +175,7 @@ public class FenceManager : MonoBehaviour
         }
 
         List<Vector3> localBoundary = ConvertBoundaryToLocalMeters(geoBoundary, groundY);
+        CacheLocalBoundary(localBoundary);
 
         if (clearExistingChildren)
         {
@@ -429,6 +431,60 @@ public class FenceManager : MonoBehaviour
                 distance += spacing;
             }
         }
+    }
+
+    public bool TryGetBoundaryWorldPoints(out List<Vector3> worldBoundary)
+    {
+        worldBoundary = new List<Vector3>();
+
+        if (_cachedLocalBoundary.Count < 3)
+        {
+            if (!TryRebuildCachedBoundaryFromYaml())
+            {
+                return false;
+            }
+        }
+
+        Transform parent = fenceParent != null ? fenceParent : transform;
+        for (int i = 0; i < _cachedLocalBoundary.Count; i++)
+        {
+            worldBoundary.Add(parent.TransformPoint(_cachedLocalBoundary[i]));
+        }
+
+        return worldBoundary.Count >= 3;
+    }
+
+    private void CacheLocalBoundary(List<Vector3> localBoundary)
+    {
+        _cachedLocalBoundary.Clear();
+        if (localBoundary == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < localBoundary.Count; i++)
+        {
+            _cachedLocalBoundary.Add(localBoundary[i]);
+        }
+    }
+
+    private bool TryRebuildCachedBoundaryFromYaml()
+    {
+        string yamlContent = LoadYamlContent();
+        if (string.IsNullOrWhiteSpace(yamlContent))
+        {
+            return false;
+        }
+
+        List<GeoPoint> geoBoundary = ParseBoundaryPoints(yamlContent);
+        if (geoBoundary == null || geoBoundary.Count < 3)
+        {
+            return false;
+        }
+
+        List<Vector3> localBoundary = ConvertBoundaryToLocalMeters(geoBoundary, groundY);
+        CacheLocalBoundary(localBoundary);
+        return _cachedLocalBoundary.Count >= 3;
     }
 
     private float GetTypicalSpacing()

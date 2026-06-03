@@ -274,7 +274,7 @@ MonoBehaviour:
   sheepTag: Sheep
   dogTag: Dog
   goalTag: Goal
-  minCameraHeight: 200
+  minCameraHeight: 50
   maxCameraHeight: 1000
   worldEdgeBuffer: 4
   viewportEdgeBuffer: 0.1
@@ -346,11 +346,11 @@ MonoBehaviour:
   fencePoses: []
   fenceType1Prefab: {fileID: 178996, guid: 4cc487e002327cb43995ca1871bd142e, type: 3}
   fenceType2Prefab: {fileID: 134746, guid: d4f06407f06d8cf41b643015132cafca, type: 3}
-  fenceMapYaml: {fileID: 4900000, guid: 91c9a75fffb1976e3a5169b44b874693, type: 3}
+  fenceMapYaml: {fileID: 4900000, guid: 337364781caa7b880b2a561d69c409f0, type: 3}
   yamlFilePath: 
   fenceParent: {fileID: 1803209572}
   fenceSpacingMeters: 2
-  spacingMultiplier: 0.5
+  spacingMultiplier: 1
   cornerOverlapFactor: 0.5
   groundY: 0
   spawnOnStart: 1
@@ -1494,7 +1494,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   debugGroundProbeStartHeight: 200
   debugGroundProbeDistance: 500
-  enableDebugLogs: 0
+  enableDebugLogs: 1
   debugLogInterval: 1
   controlInterval: 0.1
   dogRadius: 1.4
@@ -1507,6 +1507,11 @@ MonoBehaviour:
   minClusterSize: 1
   boundaryPadding: 1
   dogBoundaryInset: 1.2
+  dogFenceProbeHeight: 0.6
+  fencePolygonErosion: 0.5
+  stoppedMoveDistanceThreshold: 0.03
+  stoppedTargetDistanceThreshold: 1.5
+  stoppedDurationBeforeLog: 1
   clusterSwitchDetectionDistance: 5
   retreatDistance: 8
   arcRadius: 10
@@ -1919,15 +1924,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8569844417795446446, guid: 1a8956f769db6b74f9b5a808d95e4173, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 23.2
+      value: 15.4
       objectReference: {fileID: 0}
     - target: {fileID: 8569844417795446446, guid: 1a8956f769db6b74f9b5a808d95e4173, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 8569844417795446446, guid: 1a8956f769db6b74f9b5a808d95e4173, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 27.7
+      value: -37.9
       objectReference: {fileID: 0}
     - target: {fileID: 8569844417795446446, guid: 1a8956f769db6b74f9b5a808d95e4173, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2045,11 +2050,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: localFrequency
-      value: 0.12
+      value: 0.15
       objectReference: {fileID: 0}
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: globalAmplitude
-      value: 0.1
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
+      propertyPath: globalFrequency
+      value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 1504323780790653290, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'

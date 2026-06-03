@@ -403,7 +403,7 @@ namespace Ursaanimation.CubicFarmAnimals
                     continue;
                 }
 
-                Vector3 closest = col.ClosestPoint(pos);
+                Vector3 closest = GetClosestPointSafe(col, pos);
                 Vector3 toFence = pos - closest;
                 float dist = toFence.magnitude;
                 if (dist < 0.0001f)
@@ -509,6 +509,21 @@ namespace Ursaanimation.CubicFarmAnimals
             }
 
             return false;
+        }
+
+        private static Vector3 GetClosestPointSafe(Collider col, Vector3 position)
+        {
+            if (col == null)
+            {
+                return position;
+            }
+
+            if (col is MeshCollider meshCollider && !meshCollider.convex)
+            {
+                return col.ClosestPointOnBounds(position);
+            }
+
+            return col.ClosestPoint(position);
         }
 
         private Vector3 ComputeDogAvoidance(Vector3 pos)

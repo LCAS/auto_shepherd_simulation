@@ -40,6 +40,13 @@ namespace Controller
         [SerializeField] private int minClusterSize = 1;
         [SerializeField] private float boundaryPadding = 1f;
         [SerializeField] private float dogBoundaryInset = 1.2f;
+        [SerializeField] private float dogFenceProbeHeight = 0.6f;
+        [SerializeField] private float fencePolygonErosion = 0.5f;
+
+        [Header("Robot Stop Diagnostics")]
+        [SerializeField] private float stoppedMoveDistanceThreshold = 0.03f;
+        [SerializeField] private float stoppedTargetDistanceThreshold = 1.5f;
+        [SerializeField] private float stoppedDurationBeforeLog = 1f;
 
         [Header("Cluster Switch Transition")]
         [SerializeField] private float clusterSwitchDetectionDistance = 5f;
@@ -53,14 +60,33 @@ namespace Controller
 
         private enum TransitionPhase { Idle, Retreating, Arcing }
 
+        private struct TargetSafetyInfo
+        {
+            public bool hadFieldBounds;
+            public bool hadFencePolygon;
+            public bool rawInsideErodedPolygon;
+            public bool clampedInsideErodedPolygon;
+            public bool adjustedForPolygon;
+            public bool fenceBlockedPath;
+            public float distanceToFenceEdge;
+            public string correctionReason;
+        }
+
         private float m_Timer;
         private Bounds m_FieldBounds;
         private bool m_HasFieldBounds;
+        private readonly List<Vector2> m_FieldPolygon = new List<Vector2>();
+        private bool m_HasFieldPolygon;
         private readonly List<Transform> m_BoundaryVisuals = new List<Transform>();
         private readonly List<Transform> m_CandidateVisuals = new List<Transform>();
         private Transform m_ChosenVisual;
         private float m_NextDebugLogTime;
         private bool m_LoggedMissingDogController;
+        private bool m_LoggedMissingFences;
+        private Vector3 m_LastDogPosition;
+        private bool m_HasLastDogPosition;
+        private float m_RobotStoppedTimer;
+        private float m_LastDiagnosticTime;
 
         // Cluster switch transition
         private TransitionPhase m_TransitionPhase = TransitionPhase.Idle;
@@ -224,7 +250,7 @@ namespace Controller
                 return;
             }
 
-            if (!m_HasFieldBounds)
+            if (!m_HasFieldBounds || !m_HasFieldPolygon)
             {
                 RefreshFieldBounds();
             }
@@ -232,7 +258,6 @@ namespace Controller
             Vector3 dogPosition = dogController.transform.position;
             Vector3 goalPosition = GetGoalPosition();
             List<List<Vector3>> clusters = BuildClusters(sheepPositions);
-            int clusterCount = clusters.Count;
             List<Vector3> prioritizedCluster = SelectPriorityCluster(clusters, sheepPositions, goalPosition);
             Vector3 newClusterCentroid = ComputeCentroid(prioritizedCluster);
 
@@ -262,9 +287,12 @@ namespace Controller
                 target = FindBestDogPosition(prioritizedCluster, dogPosition, goalPosition, out centroid, out flockRadius, out desiredDogDistance, out candidatePositions);
             }
 
+            TargetSafetyInfo safetyInfo;
+            Vector3 safeTarget = MakeReachableDogTarget(dogPosition, target, out safetyInfo);
+
             if (enableDebugLogs && Time.time >= m_NextDebugLogTime)
             {
-                Debug.Log($"[Control] Step: sheep={sheepPositions.Count}, clusters={clusterCount}, selectedClusterSize={prioritizedCluster.Count}, centroid={centroid}, flockRadius={flockRadius:F2}, phase={m_TransitionPhase}, target={target}", this);
+                LogRobotTargetDiagnostic(dogPosition, target, safeTarget, safetyInfo);
                 m_NextDebugLogTime = Time.time + Mathf.Max(0.1f, debugLogInterval);
             }
 
@@ -272,10 +300,9 @@ namespace Controller
             {
                 RenderBoundaryRings(clusters);
                 RenderCandidateVisuals(candidatePositions);
-                RenderChosenVisual(target);
+                RenderChosenVisual(safeTarget);
             }
 
-            Vector3 safeTarget = MakeReachableDogTarget(dogPosition, target);
             dogController.SetTarget(safeTarget);
         }
 
@@ -289,7 +316,7 @@ namespace Controller
             if (awayFromNew.sqrMagnitude < 0.0001f) awayFromNew = Vector3.forward;
             awayFromNew.Normalize();
 
-            Vector3 retreatPoint = ClampToField(oldCentroid + awayFromNew * retreatDistance);
+            Vector3 retreatPoint = MakeReachableDogTarget(dogPos, oldCentroid + awayFromNew * retreatDistance);
             retreatPoint.y = 0f;
             m_TransitionTarget = retreatPoint;
             m_TransitionPhase = TransitionPhase.Retreating;
@@ -311,20 +338,20 @@ namespace Controller
             // Choose shortest arc direction
             float delta = Mathf.DeltaAngle(startAngle * Mathf.Rad2Deg, endAngle * Mathf.Rad2Deg) * Mathf.Deg2Rad;
             int steps = Mathf.Max(2, arcSteps);
+            Vector3 waypointOrigin = retreatPoint;
 
             for (int i = 1; i <= steps; i++)
             {
                 float t = (float)i / steps;
                 float angle = startAngle + delta * t;
                 Vector3 arcPoint = newCentroid + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * arcRadius;
+                arcPoint = MakeReachableDogTarget(waypointOrigin, arcPoint);
                 arcPoint.y = 0f;
-                m_ArcWaypoints.Enqueue(ClampToField(arcPoint));
+                m_ArcWaypoints.Enqueue(arcPoint);
+                waypointOrigin = arcPoint;
             }
 
-            if (enableDebugLogs)
-            {
-                Debug.Log($"[Control] Cluster switch detected. Retreating to {retreatPoint}, then arcing through {m_ArcWaypoints.Count} waypoints to new cluster at {newCentroid}.", this);
-            }
+            LogRobotEvent($"Cluster switch transition started. phase={m_TransitionPhase}, target={m_TransitionTarget}");
         }
 
         private Vector3 TickTransition(Vector3 dogPos, Vector3 newCentroid, Vector3 goalPosition, out Vector3 centroid, out float flockRadius, out float desiredDogDistance, out List<Vector3> candidatePositions)
@@ -369,6 +396,67 @@ namespace Controller
             }
 
             return m_TransitionTarget;
+        }
+
+        private void LogRobotTargetDiagnostic(Vector3 dogPosition, Vector3 rawTarget, Vector3 safeTarget, TargetSafetyInfo safetyInfo)
+        {
+            if (!enableDebugLogs)
+            {
+                return;
+            }
+
+            Vector3 dogPlanar = dogPosition;
+            Vector3 targetPlanar = safeTarget;
+            dogPlanar.y = 0f;
+            targetPlanar.y = 0f;
+
+            float targetDistance = Vector3.Distance(dogPlanar, targetPlanar);
+            float movedDistance = 0f;
+            float elapsed = m_LastDiagnosticTime > 0f ? Mathf.Max(0.0001f, Time.time - m_LastDiagnosticTime) : 0f;
+
+            if (m_HasLastDogPosition)
+            {
+                Vector3 lastPlanar = m_LastDogPosition;
+                lastPlanar.y = 0f;
+                movedDistance = Vector3.Distance(lastPlanar, dogPlanar);
+            }
+
+            bool targetChanged = Vector3.Distance(rawTarget, safeTarget) > 0.05f;
+            bool nearTarget = targetDistance <= Mathf.Max(0.1f, stoppedTargetDistanceThreshold);
+            bool barelyMoved = m_HasLastDogPosition && movedDistance <= Mathf.Max(0.001f, stoppedMoveDistanceThreshold);
+
+            if (!nearTarget && barelyMoved)
+            {
+                m_RobotStoppedTimer += elapsed > 0f ? elapsed : Mathf.Max(0.1f, debugLogInterval);
+            }
+            else
+            {
+                m_RobotStoppedTimer = 0f;
+            }
+
+            bool likelyStopped = m_RobotStoppedTimer >= Mathf.Max(0.1f, stoppedDurationBeforeLog);
+            string state = likelyStopped ? "STOPPED_SUSPECTED" : nearTarget ? "NEAR_TARGET" : "COMMANDING";
+            string boundsState = safetyInfo.hadFieldBounds ? "bounds=ok" : "bounds=unavailable";
+            string polygonState = !safetyInfo.hadFencePolygon
+                ? "polygon=unavailable"
+                : $"polygonRaw={(safetyInfo.rawInsideErodedPolygon ? "ok" : "reject")}, polygonSafe={(safetyInfo.clampedInsideErodedPolygon ? "ok" : "reject")}, edgeDist={safetyInfo.distanceToFenceEdge:F2}m, erosion={fencePolygonErosion:F2}m";
+            string correction = targetChanged || safetyInfo.fenceBlockedPath || safetyInfo.adjustedForPolygon
+                ? $"correction={safetyInfo.correctionReason}, raw={rawTarget}, safe={safeTarget}"
+                : "correction=none";
+
+            Debug.Log($"[Control][RobotTarget] state={state}, phase={m_TransitionPhase}, targetDistance={targetDistance:F2}m, movedSinceLastLog={movedDistance:F3}m, stoppedFor={m_RobotStoppedTimer:F2}s, {boundsState}, {polygonState}, pathFenceHit={safetyInfo.fenceBlockedPath}, {correction}", this);
+
+            m_LastDogPosition = dogPosition;
+            m_HasLastDogPosition = true;
+            m_LastDiagnosticTime = Time.time;
+        }
+
+        private void LogRobotEvent(string message)
+        {
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[Control][RobotTarget] {message}", this);
+            }
         }
 
         private List<Vector3> SelectPriorityCluster(List<List<Vector3>> clusters, List<Vector3> fallbackSheepPositions, Vector3 goalPosition)
@@ -569,17 +657,22 @@ namespace Controller
 
         private void RefreshFieldBounds()
         {
+            RefreshFencePolygon();
+
             GameObject[] fences = GameObject.FindGameObjectsWithTag("Fence");
             if (fences == null || fences.Length == 0)
             {
                 m_HasFieldBounds = false;
 
-                if (enableDebugLogs)
+                if (enableDebugLogs && !m_LoggedMissingFences)
                 {
+                    m_LoggedMissingFences = true;
                     Debug.LogWarning("[Control] No fence objects found with tag 'Fence'. Field bounds disabled.", this);
                 }
                 return;
             }
+
+            m_LoggedMissingFences = false;
 
             bool hasBounds = false;
             Vector3 min = Vector3.zero;
@@ -649,10 +742,114 @@ namespace Controller
             m_FieldBounds = new Bounds((min + max) * 0.5f, new Vector3(max.x - min.x, 1000f, max.z - min.z));
             m_HasFieldBounds = true;
 
-            if (enableDebugLogs)
+        }
+
+        private void RefreshFencePolygon()
+        {
+            m_FieldPolygon.Clear();
+            m_HasFieldPolygon = false;
+
+            FenceManager fenceManager = FindFirstObjectByType<FenceManager>();
+            if (fenceManager == null || fenceManager.fencePoses == null || fenceManager.fencePoses.Count < 3)
             {
-                Debug.Log($"[Control] Field bounds refreshed. min={m_FieldBounds.min}, max={m_FieldBounds.max}", this);
+                RefreshFencePolygonFromSceneObjects();
+                return;
             }
+
+            for (int i = 0; i < fenceManager.fencePoses.Count; i++)
+            {
+                Vector3 point = fenceManager.fencePoses[i].position;
+                Vector2 xz = new Vector2(point.x, point.z);
+
+                if (m_FieldPolygon.Count > 0 && (m_FieldPolygon[m_FieldPolygon.Count - 1] - xz).sqrMagnitude < 0.0001f)
+                {
+                    continue;
+                }
+
+                m_FieldPolygon.Add(xz);
+            }
+
+            if (m_FieldPolygon.Count > 2 && (m_FieldPolygon[0] - m_FieldPolygon[m_FieldPolygon.Count - 1]).sqrMagnitude < 0.0001f)
+            {
+                m_FieldPolygon.RemoveAt(m_FieldPolygon.Count - 1);
+            }
+
+            m_HasFieldPolygon = m_FieldPolygon.Count >= 3;
+        }
+
+        private void RefreshFencePolygonFromSceneObjects()
+        {
+            GameObject[] fences = GameObject.FindGameObjectsWithTag("Fence");
+            if (fences == null || fences.Length < 3)
+            {
+                return;
+            }
+
+            List<Vector2> unordered = new List<Vector2>(fences.Length);
+            for (int i = 0; i < fences.Length; i++)
+            {
+                if (fences[i] == null)
+                {
+                    continue;
+                }
+
+                Vector3 p = fences[i].transform.position;
+                Vector2 xz = new Vector2(p.x, p.z);
+                bool duplicate = false;
+                for (int j = 0; j < unordered.Count; j++)
+                {
+                    if ((unordered[j] - xz).sqrMagnitude < 0.0001f)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                if (!duplicate)
+                {
+                    unordered.Add(xz);
+                }
+            }
+
+            if (unordered.Count < 3)
+            {
+                return;
+            }
+
+            int startIndex = 0;
+            for (int i = 1; i < unordered.Count; i++)
+            {
+                if (unordered[i].x < unordered[startIndex].x ||
+                    (Mathf.Approximately(unordered[i].x, unordered[startIndex].x) && unordered[i].y < unordered[startIndex].y))
+                {
+                    startIndex = i;
+                }
+            }
+
+            Vector2 current = unordered[startIndex];
+            m_FieldPolygon.Add(current);
+            unordered.RemoveAt(startIndex);
+
+            while (unordered.Count > 0)
+            {
+                int nearestIndex = 0;
+                float nearestDistance = (unordered[0] - current).sqrMagnitude;
+                for (int i = 1; i < unordered.Count; i++)
+                {
+                    float distance = (unordered[i] - current).sqrMagnitude;
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestIndex = i;
+                    }
+                }
+
+                current = unordered[nearestIndex];
+                m_FieldPolygon.Add(current);
+                unordered.RemoveAt(nearestIndex);
+            }
+
+            m_HasFieldPolygon = m_FieldPolygon.Count >= 3;
         }
 
         private Vector3 FindBestDogPosition(List<Vector3> sheepPositions, Vector3 dogPosition, Vector3 goalPosition, out Vector3 centroid, out float flockRadius, out float desiredDogDistance, out List<Vector3> candidatePositions)
@@ -731,11 +928,7 @@ namespace Controller
                 Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
                 Vector3 candidate = centroid + direction * (flockRadius + desiredDogDistance);
 
-                if (!IsWithinField(candidate))
-                {
-                    continue;
-                }
-
+                candidate = MakeReachableDogTarget(dogPosition, candidate);
                 candidatePositions.Add(candidate);
 
                 Vector3 candidateDir = candidate - centroid;
@@ -825,9 +1018,36 @@ namespace Controller
 
         private Vector3 MakeReachableDogTarget(Vector3 dogPosition, Vector3 desiredTarget)
         {
+            TargetSafetyInfo safetyInfo;
+            return MakeReachableDogTarget(dogPosition, desiredTarget, out safetyInfo);
+        }
+
+        private Vector3 MakeReachableDogTarget(Vector3 dogPosition, Vector3 desiredTarget, out TargetSafetyInfo safetyInfo)
+        {
             Vector3 clamped = ClampToField(desiredTarget);
-            Vector3 from = dogPosition + Vector3.up * 0.2f;
-            Vector3 to = clamped + Vector3.up * 0.2f;
+            safetyInfo = new TargetSafetyInfo
+            {
+                hadFieldBounds = m_HasFieldBounds,
+                hadFencePolygon = m_HasFieldPolygon,
+                rawInsideErodedPolygon = IsInsideErodedFencePolygon(desiredTarget),
+                clampedInsideErodedPolygon = IsInsideErodedFencePolygon(clamped),
+                distanceToFenceEdge = GetDistanceToFencePolygonEdge(clamped),
+                correctionReason = "none"
+            };
+
+            if (m_HasFieldPolygon && !safetyInfo.clampedInsideErodedPolygon)
+            {
+                Vector3 polygonSafe = MoveTargetInsideErodedFencePolygon(dogPosition, clamped);
+                safetyInfo.adjustedForPolygon = true;
+                safetyInfo.correctionReason = safetyInfo.rawInsideErodedPolygon ? "rect_clamp_near_fence" : "outside_or_too_close_to_fence_polygon";
+                clamped = polygonSafe;
+                safetyInfo.clampedInsideErodedPolygon = IsInsideErodedFencePolygon(clamped);
+                safetyInfo.distanceToFenceEdge = GetDistanceToFencePolygonEdge(clamped);
+            }
+
+            float probeHeight = Mathf.Max(0.05f, dogFenceProbeHeight);
+            Vector3 from = dogPosition + Vector3.up * probeHeight;
+            Vector3 to = clamped + Vector3.up * probeHeight;
             Vector3 ray = to - from;
             float dist = ray.magnitude;
 
@@ -838,19 +1058,215 @@ namespace Controller
             }
 
             Vector3 dir = ray / dist;
-            if (Physics.Raycast(from, dir, out RaycastHit hit, dist, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (TryGetNearestFenceHit(from, dir, dist, out RaycastHit hit))
             {
-                if (hit.collider != null && IsFenceCollider(hit.collider))
-                {
-                    Vector3 fallback = hit.point - dir * Mathf.Max(0.4f, dogBoundaryInset * 0.5f);
-                    fallback = ClampToField(fallback);
-                    fallback.y = dogPosition.y;
-                    return fallback;
-                }
+                Vector3 fallback = hit.point - dir * Mathf.Max(0.4f, dogBoundaryInset * 0.5f);
+                fallback = MoveTargetInsideErodedFencePolygon(dogPosition, ClampToField(fallback));
+                fallback.y = dogPosition.y;
+                safetyInfo.fenceBlockedPath = true;
+                safetyInfo.correctionReason = "path_crosses_fence";
+                safetyInfo.clampedInsideErodedPolygon = IsInsideErodedFencePolygon(fallback);
+                safetyInfo.distanceToFenceEdge = GetDistanceToFencePolygonEdge(fallback);
+                return fallback;
             }
 
             clamped.y = dogPosition.y;
             return clamped;
+        }
+
+        private bool IsInsideErodedFencePolygon(Vector3 point)
+        {
+            if (!m_HasFieldPolygon)
+            {
+                return true;
+            }
+
+            Vector2 xz = new Vector2(point.x, point.z);
+            if (!IsPointInPolygon(xz, m_FieldPolygon))
+            {
+                return false;
+            }
+
+            float erosion = Mathf.Max(0f, fencePolygonErosion);
+            if (erosion <= 0f)
+            {
+                return true;
+            }
+
+            return GetDistanceToPolygonEdges(xz, m_FieldPolygon) >= erosion;
+        }
+
+        private Vector3 MoveTargetInsideErodedFencePolygon(Vector3 origin, Vector3 target)
+        {
+            if (!m_HasFieldPolygon || IsInsideErodedFencePolygon(target))
+            {
+                return target;
+            }
+
+            Vector3 safeOrigin = origin;
+            if (!IsInsideErodedFencePolygon(safeOrigin))
+            {
+                safeOrigin = GetFencePolygonCenter();
+            }
+
+            if (!IsInsideErodedFencePolygon(safeOrigin))
+            {
+                Vector2 closest = GetClosestPointOnPolygonEdges(new Vector2(target.x, target.z), m_FieldPolygon);
+                Vector3 pulled = Vector3.Lerp(new Vector3(closest.x, target.y, closest.y), GetFencePolygonCenter(), 0.2f);
+                return ClampToField(pulled);
+            }
+
+            Vector3 low = safeOrigin;
+            Vector3 high = target;
+            for (int i = 0; i < 18; i++)
+            {
+                Vector3 mid = Vector3.Lerp(low, high, 0.5f);
+                if (IsInsideErodedFencePolygon(mid))
+                {
+                    low = mid;
+                }
+                else
+                {
+                    high = mid;
+                }
+            }
+
+            low.y = target.y;
+            return ClampToField(low);
+        }
+
+        private Vector3 GetFencePolygonCenter()
+        {
+            if (!m_HasFieldPolygon)
+            {
+                return m_FieldBounds.center;
+            }
+
+            Vector2 center = Vector2.zero;
+            for (int i = 0; i < m_FieldPolygon.Count; i++)
+            {
+                center += m_FieldPolygon[i];
+            }
+
+            center /= m_FieldPolygon.Count;
+            return new Vector3(center.x, m_FieldBounds.center.y, center.y);
+        }
+
+        private float GetDistanceToFencePolygonEdge(Vector3 point)
+        {
+            if (!m_HasFieldPolygon)
+            {
+                return -1f;
+            }
+
+            return GetDistanceToPolygonEdges(new Vector2(point.x, point.z), m_FieldPolygon);
+        }
+
+        private static bool IsPointInPolygon(Vector2 point, List<Vector2> polygon)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[j];
+                float denom = b.y - a.y;
+                if (Mathf.Abs(denom) < 0.000001f)
+                {
+                    denom = denom < 0f ? -0.000001f : 0.000001f;
+                }
+
+                bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
+                    (point.x < (b.x - a.x) * (point.y - a.y) / denom + a.x);
+
+                if (crosses)
+                {
+                    inside = !inside;
+                }
+            }
+
+            return inside;
+        }
+
+        private static float GetDistanceToPolygonEdges(Vector2 point, List<Vector2> polygon)
+        {
+            float best = float.PositiveInfinity;
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[(i + 1) % polygon.Count];
+                float distance = DistancePointToSegment(point, a, b);
+                if (distance < best)
+                {
+                    best = distance;
+                }
+            }
+
+            return best;
+        }
+
+        private static Vector2 GetClosestPointOnPolygonEdges(Vector2 point, List<Vector2> polygon)
+        {
+            Vector2 closest = polygon[0];
+            float best = float.PositiveInfinity;
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[(i + 1) % polygon.Count];
+                Vector2 candidate = ClosestPointOnSegment(point, a, b);
+                float distance = (candidate - point).sqrMagnitude;
+                if (distance < best)
+                {
+                    best = distance;
+                    closest = candidate;
+                }
+            }
+
+            return closest;
+        }
+
+        private static float DistancePointToSegment(Vector2 point, Vector2 a, Vector2 b)
+        {
+            return Vector2.Distance(point, ClosestPointOnSegment(point, a, b));
+        }
+
+        private static Vector2 ClosestPointOnSegment(Vector2 point, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float denom = ab.sqrMagnitude;
+            if (denom < 0.000001f)
+            {
+                return a;
+            }
+
+            float t = Mathf.Clamp01(Vector2.Dot(point - a, ab) / denom);
+            return a + ab * t;
+        }
+
+        private bool TryGetNearestFenceHit(Vector3 origin, Vector3 direction, float distance, out RaycastHit nearestFenceHit)
+        {
+            nearestFenceHit = new RaycastHit();
+
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            bool foundFence = false;
+            float nearestDistance = float.PositiveInfinity;
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                RaycastHit hit = hits[i];
+                if (hit.collider == null || !IsFenceCollider(hit.collider))
+                {
+                    continue;
+                }
+
+                if (hit.distance < nearestDistance)
+                {
+                    nearestDistance = hit.distance;
+                    nearestFenceHit = hit;
+                    foundFence = true;
+                }
+            }
+
+            return foundFence;
         }
 
         private static bool IsFenceCollider(Collider collider)
@@ -895,11 +1311,6 @@ namespace Controller
                 GameObject instance = Instantiate(prefab, debugVisualsRoot);
                 instance.name = $"{baseName}_{pool.Count:D2}";
                 pool.Add(instance.transform);
-
-                if (enableDebugLogs)
-                {
-                    Debug.Log($"[Control] Spawned debug visual '{instance.name}'.", this);
-                }
             }
 
             for (int i = 0; i < pool.Count; i++)
@@ -909,11 +1320,6 @@ namespace Controller
                     GameObject instance = Instantiate(prefab, debugVisualsRoot);
                     instance.name = $"{baseName}_{i:D2}";
                     pool[i] = instance.transform;
-
-                    if (enableDebugLogs)
-                    {
-                        Debug.Log($"[Control] Recreated missing debug visual '{instance.name}'.", this);
-                    }
                 }
             }
         }
@@ -935,11 +1341,6 @@ namespace Controller
                 GameObject chosen = Instantiate(chosenPositionPrefab, debugVisualsRoot);
                 chosen.name = "ChosenPosition";
                 m_ChosenVisual = chosen.transform;
-
-                if (enableDebugLogs)
-                {
-                    Debug.Log("[Control] Spawned debug visual 'ChosenPosition'.", this);
-                }
             }
         }
 
