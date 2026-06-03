@@ -33,3 +33,7 @@ public class RandomlySwapMaterials : MonoBehaviour
         _renderer.material = selected;
     }
 }
+
+/*
+I like this switching of material, but the materials look to be tiling with clear end points, is there a way to make it so that the texture file is more blended over the plane it is applied to?
+*/

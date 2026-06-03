@@ -51,6 +51,16 @@ namespace Ursaanimation.CubicFarmAnimals
         [SerializeField] private float groundPlaneY = 0f;
         [SerializeField] private float visualForwardOffsetDegrees = 0f;
 
+        [Header("Ground Following")]
+        [SerializeField] private bool followGroundSurface = true;
+        [SerializeField] private LayerMask groundLayerMask = ~0;
+        [SerializeField] private float groundProbeStartHeight = 4f;
+        [SerializeField] private float groundProbeDistance = 20f;
+        [SerializeField] private float groundHeightOffset = 0.05f;
+
+        [Header("Debug")]
+        [SerializeField] private bool showDebugGizmos = false;
+
         [Header("Fence Collision")]
         [SerializeField] private float bodyCollisionRadius = 0.35f;
         [SerializeField] private float fenceStopPadding = 0.08f;
@@ -130,6 +140,15 @@ namespace Ursaanimation.CubicFarmAnimals
 
             _anim.applyRootMotion = false;
 
+            if (followGroundSurface)
+            {
+                float sampledGroundY = SampleGroundY(transform.position, out bool hitGround);
+                if (hitGround)
+                {
+                    groundHeightOffset = Mathf.Max(0f, transform.position.y - sampledGroundY);
+                }
+            }
+
             // Validate which animation states actually exist in the controller
             _idleAnimValid     = !string.IsNullOrEmpty(IDLE_ANIM)     && _anim.HasState(0, Animator.StringToHash(IDLE_ANIM));
             _walkAnimValid     = !string.IsNullOrEmpty(WALK_ANIM)     && _anim.HasState(0, Animator.StringToHash(WALK_ANIM));
@@ -176,6 +195,7 @@ namespace Ursaanimation.CubicFarmAnimals
 
             if (_isSitting)
             {
+                MaintainGroundHeight();
                 return;
             }
 
@@ -199,11 +219,15 @@ namespace Ursaanimation.CubicFarmAnimals
             {
                 Vector3 move = _velocity * Time.deltaTime;
                 Vector3 nextPos = GetFenceSafePosition(transform.position, move);
-                nextPos.y = groundPlaneY;
+                nextPos.y = ResolveTargetY(nextPos);
                 _rb.MovePosition(nextPos);
 
                 Quaternion targetRot = Quaternion.LookRotation(_velocity.normalized, Vector3.up) * Quaternion.Euler(0f, visualForwardOffsetDegrees, 0f);
                 _rb.MoveRotation(Quaternion.Slerp(_rb.rotation, targetRot, 5f * Time.deltaTime));
+            }
+            else
+            {
+                MaintainGroundHeight();
             }
 
             UpdateAnimation(targetSpeed);
@@ -217,7 +241,6 @@ namespace Ursaanimation.CubicFarmAnimals
             float moveDistance = planarMove.magnitude;
             if (moveDistance < 0.0001f)
             {
-                currentPos.y = groundPlaneY;
                 return currentPos;
             }
 
@@ -248,7 +271,6 @@ namespace Ursaanimation.CubicFarmAnimals
                     Vector3 repel = normal * Mathf.Max(0.01f, fenceRepelStep);
 
                     Vector3 redirected = approach + slide + repel;
-                    redirected.y = groundPlaneY;
 
                     // Bias velocity away from fence so steering reacts as repulsion instead of repeated stop.
                     float currentSpeed = _velocity.magnitude;
@@ -261,8 +283,50 @@ namespace Ursaanimation.CubicFarmAnimals
             }
 
             Vector3 next = currentPos + planarMove;
-            next.y = groundPlaneY;
             return next;
+        }
+
+        private void MaintainGroundHeight()
+        {
+            Vector3 pos = transform.position;
+            float targetY = ResolveTargetY(pos);
+            if (Mathf.Abs(pos.y - targetY) > 0.001f)
+            {
+                pos.y = targetY;
+                _rb.MovePosition(pos);
+            }
+        }
+
+        private float ResolveTargetY(Vector3 worldPos)
+        {
+            if (!followGroundSurface)
+            {
+                return groundPlaneY;
+            }
+
+            float sampledGroundY = SampleGroundY(worldPos, out bool hitGround);
+            if (hitGround)
+            {
+                return sampledGroundY + Mathf.Max(0f, groundHeightOffset);
+            }
+
+            return groundPlaneY + Mathf.Max(0f, groundHeightOffset);
+        }
+
+        private float SampleGroundY(Vector3 worldPos, out bool hitGround)
+        {
+            float startHeight = Mathf.Max(0.5f, groundProbeStartHeight);
+            float maxDistance = Mathf.Max(startHeight + 0.5f, groundProbeDistance);
+            Vector3 origin = new Vector3(worldPos.x, worldPos.y + startHeight, worldPos.z);
+
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, maxDistance, groundLayerMask, QueryTriggerInteraction.Ignore))
+            {
+                hitGround = true;
+                return hit.point.y;
+            }
+
+            hitGround = false;
+            return groundPlaneY;
         }
 
         private void UpdateAnimation(float targetSpeed)
@@ -501,6 +565,30 @@ namespace Ursaanimation.CubicFarmAnimals
             yield return new WaitForSeconds(1f);
             _isSitting = false;
             _standSlowTimer = STAND_SLOW_TIME;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (!showDebugGizmos)
+            {
+                return;
+            }
+
+            Vector3 basePos = transform.position;
+            float targetY = ResolveTargetY(basePos);
+            Vector3 debugPos = new Vector3(basePos.x, targetY, basePos.z);
+
+            Gizmos.color = Color.white;
+            Gizmos.DrawLine(basePos, debugPos);
+
+            Gizmos.color = new Color(0.1f, 0.8f, 1f, 0.45f);
+            Gizmos.DrawWireSphere(debugPos, Mathf.Max(0.1f, neighbourRadius));
+
+            Gizmos.color = new Color(1f, 0.45f, 0.15f, 0.65f);
+            Gizmos.DrawWireSphere(debugPos, Mathf.Max(0.1f, dogRepulsionRadius));
+
+            Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.65f);
+            Gizmos.DrawWireSphere(debugPos, Mathf.Max(0.1f, fenceRepulsionRadius));
         }
     }
 }

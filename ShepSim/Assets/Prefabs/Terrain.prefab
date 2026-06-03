@@ -13,9 +13,10 @@ GameObject:
   - component: {fileID: 1504323780790653290}
   - component: {fileID: 6476885263130087369}
   - component: {fileID: 5295084877330147309}
+  - component: {fileID: -8854956710488373302}
   m_Layer: 0
   m_Name: Terrain
-  m_TagString: Untagged
+  m_TagString: Field
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -122,3 +123,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe1ccf0b02c8a462da76e4348fcce345, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  materials: []
+  randomiseOnStart: 1
+  materialIndex: 0
+--- !u!114 &-8854956710488373302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6632110124502492865}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3640d5db7d7651224836e77ce686a37f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  applyOnStart: 1
+  amplitude: 0.2
+  frequency: 0.2
+  noiseOffset: {x: 100, y: 100}

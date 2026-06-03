@@ -17,6 +17,10 @@ namespace Controller
         [SerializeField] private Transform debugVisualsRoot;
         [SerializeField] private int boundaryRingPointCount = 24;
         [SerializeField] private float debugVerticalOffset = 0.05f;
+        [SerializeField] private bool projectDebugVisualsToGround = true;
+        [SerializeField] private LayerMask debugGroundLayerMask = ~0;
+        [SerializeField] private float debugGroundProbeStartHeight = 200f;
+        [SerializeField] private float debugGroundProbeDistance = 500f;
 
         [Header("Debug Logs")]
         [SerializeField] private bool enableDebugLogs = true;
@@ -63,6 +67,31 @@ namespace Controller
         private Vector3 m_LastClusterCentroid = Vector3.positiveInfinity;
         private Vector3 m_TransitionTarget;
         private readonly Queue<Vector3> m_ArcWaypoints = new Queue<Vector3>();
+
+        private bool TryGetGroundProjectedPoint(Vector3 worldPoint, out Vector3 projected)
+        {
+            projected = worldPoint;
+
+            if (!projectDebugVisualsToGround)
+            {
+                projected.y = worldPoint.y + debugVerticalOffset;
+                return true;
+            }
+
+            float startHeight = Mathf.Max(1f, debugGroundProbeStartHeight);
+            float maxDistance = Mathf.Max(startHeight + 1f, debugGroundProbeDistance);
+            Vector3 rayOrigin = worldPoint + Vector3.up * startHeight;
+            Ray ray = new Ray(rayOrigin, Vector3.down);
+
+            if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, debugGroundLayerMask, QueryTriggerInteraction.Ignore))
+            {
+                projected = hit.point + Vector3.up * debugVerticalOffset;
+                return true;
+            }
+
+            projected.y = worldPoint.y + debugVerticalOffset;
+            return false;
+        }
 
         private void Start()
         {
@@ -965,7 +994,7 @@ namespace Controller
 
                     float t = (float)i / clusterMarkerCount;
                     Vector3 markerPosition = SampleHullPerimeter(hull, t);
-                    markerPosition.y = 0f;
+                    TryGetGroundProjectedPoint(markerPosition, out markerPosition);
                     marker.position = markerPosition;
                     marker.gameObject.SetActive(true);
                 }
@@ -1132,7 +1161,7 @@ namespace Controller
                 if (i < needed)
                 {
                     Vector3 markerPosition = candidatePositions[i];
-                    markerPosition.y = 0f;
+                    TryGetGroundProjectedPoint(markerPosition, out markerPosition);
                     marker.position = markerPosition;
                     marker.gameObject.SetActive(true);
                 }
@@ -1152,7 +1181,7 @@ namespace Controller
             }
 
             Vector3 markerPosition = chosenPosition;
-            markerPosition.y = 0f;
+            TryGetGroundProjectedPoint(markerPosition, out markerPosition);
             m_ChosenVisual.position = markerPosition;
             m_ChosenVisual.gameObject.SetActive(true);
         }
