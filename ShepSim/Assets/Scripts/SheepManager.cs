@@ -13,6 +13,8 @@ public class SheepManager : MonoBehaviour
     [Header("Spawn Settings")]
     [Tooltip("Percentage of spawned sheep that should use BlackSheepPrefab.")]
     [Range(0f, 100f)] public float diversity_percentage = 20f;
+    [Tooltip("How strongly spawned sheep scale varies. At 1, sheep spawn between 80% and 120% of prefab size.")]
+    [Range(0f, 1f)] public float size_variation = 1f;
     [Min(0)] public int total_sheep = 50;
     [Min(0f)] public float spawn_radius = 20f;
     [Tooltip("Small offset above the sampled ground/fence plane.")]
@@ -58,7 +60,9 @@ public class SheepManager : MonoBehaviour
             if (TryFindSpawnPosition(boundary, maxAttempts, out Vector3 position))
             {
                 Quaternion rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                Instantiate(spawnOrder[i], position, rotation, SheepParentGameobject.transform);
+                GameObject sheep = Instantiate(spawnOrder[i], position, rotation, SheepParentGameobject.transform);
+                float scaleMultiplier = Random.Range(1f - 0.5f * size_variation, 1f + 0.5f * size_variation);
+                sheep.transform.localScale *= scaleMultiplier;
                 spawned++;
             }
             else
