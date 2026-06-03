@@ -92,6 +92,8 @@ public class FenceManager : MonoBehaviour
 
     private Coroutine _spawnRoutine;
 
+    public bool IsGeneratingFences => _spawnRoutine != null;
+
     private void Start()
     {
         if (spawnOnStart)
@@ -675,6 +677,13 @@ public class FenceManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    public bool TryProjectWorldPointToSurface(Vector3 worldPos, out Vector3 projectedWorldPos)
+    {
+        Transform parent = fenceParent != null ? fenceParent : transform;
+        Vector3 localPos = parent.InverseTransformPoint(worldPos);
+        return TryProjectToSurface(parent, localPos, out projectedWorldPos);
     }
 
     private Vector3 GetVerticalDirection()
