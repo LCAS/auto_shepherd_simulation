@@ -3112,8 +3112,8 @@ MonoBehaviour:
   sheepTag: Sheep
   dogTag: Dog
   goalTag: Goal
-  minCameraHeight: 15
-  maxCameraHeight: 500
+  minCameraHeight: 900
+  maxCameraHeight: 1000
   worldEdgeBuffer: 4
   viewportEdgeBuffer: 0.1
   smoothDampTime: 0.3
@@ -10048,7 +10048,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6652054371542524999, guid: aa87d34e5f6498c3d886020e5bcaa687, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10241,7 +10241,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6652054371542524999, guid: aa87d34e5f6498c3d886020e5bcaa687, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
