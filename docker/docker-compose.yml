@@ -1,3 +1,6 @@
+networks:
+  simnet: {}
+
 services:
   auto_shepherd_simulation_ros2_humble:
     container_name: auto_shepherd_simulation_ros2_humble  # <- included for .git action identification
@@ -8,7 +11,9 @@ services:
     stdin_open: true
     tty: true
     command: /bin/bash
-    network_mode: host
+
+    #network_mode: host
+    networks: [simnet]
 
     privileged: true
     devices:
@@ -28,5 +33,26 @@ services:
 
     environment:
       - BASE_WS=/home/ros/base_ws
-      - DISPLAY=${HOST_DISPLAY_VAR:-:0}
+      #- DISPLAY=${HOST_DISPLAY_VAR:-:0}
+      - DISPLAY=desktop:0               # << points at the VNC server
       - QT_X11_NO_MITSHM=1
+
+
+  desktop:
+    image: consol/ubuntu-xfce-vnc:latest
+    ports:
+      - "5900:5901"          # raw VNC
+      - "6080:6901"          # noVNC in browser
+    volumes:
+      # host repo → ~/workspace inside the desktop session
+      - ../:/headless/workspace:rw
+
+    # Tune look & feel (defaults shown)
+    environment:
+      - VNC_PW=0000                  # viewer password
+      - VNC_COL_DEPTH=24             # colour depth
+      - VNC_RESOLUTION=1920x1080     # virtual screen size
+
+    # So the desktop starts after your app if they depend on each other
+    depends_on:
+      - auto_shepherd_simulation_ros2_humble
