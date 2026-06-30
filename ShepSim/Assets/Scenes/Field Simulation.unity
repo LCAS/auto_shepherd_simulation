@@ -158,7 +158,7 @@ Camera:
   serializedVersion: 2
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
-  m_projectionMatrixMode: 2
+  m_projectionMatrixMode: 1
   m_GateFitMode: 3
   m_FOVAxisMode: 0
   m_Iso: 200
@@ -206,15 +206,15 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.14633772, y: -0.8421203, z: 0.28337848, w: 0.4348741}
-  m_LocalPosition: {x: 58.5, y: 49.1, z: 33.6}
+  m_LocalRotation: {x: 0.11168978, y: -0.8443385, z: 0.24682193, w: 0.46227363}
+  m_LocalPosition: {x: 60.78, y: 45.41, z: 35.22}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 651709078}
   - {fileID: 573660945}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 37.197, y: -125.376, z: 0}
+  m_LocalEulerAnglesHint: {x: 31.337, y: -121.853, z: 2.657}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -329,6 +329,7 @@ Transform:
   m_Children:
   - {fileID: 953436783}
   - {fileID: 1803209572}
+  - {fileID: 745885060}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &341595931
@@ -546,6 +547,7 @@ MonoBehaviour:
   BlackSheepPrefab: {fileID: 5845806735159977712, guid: 974f16ec98a41ce13b8e0c0d301f8a5b, type: 3}
   FenceManager: {fileID: 341595931}
   diversity_percentage: 9.9
+  size_variation: 1
   total_sheep: 50
   spawn_radius: 20
   groundOffset: 0.05
@@ -813,6 +815,88 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1312189753184432362, guid: aa87d34e5f6498c3d886020e5bcaa687, type: 3}
   m_PrefabInstance: {fileID: 1186172695}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &745885059
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 745885060}
+  - component: {fileID: 745885062}
+  - component: {fileID: 745885061}
+  m_Layer: 0
+  m_Name: Trees
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &745885060
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 745885059}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 341595930}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &745885061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 745885059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e26a0c69967dd48ab97e735cc2bed4d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  treeBreeds:
+  - breedName: Ash
+    variants:
+    - {fileID: 8185793832496569501, guid: 3bcf6e78553a7f54c8bf39912b4124e3, type: 3}
+    - {fileID: 8185793832496569501, guid: 632cb5ba8e6554c4d895ced6ffb22702, type: 3}
+    - {fileID: 8185793832496569501, guid: 189457b8a8df4454e955c74118b57a4d, type: 3}
+    - {fileID: 8185793832496569501, guid: 35e42d18fc5193b42b806528fbefddeb, type: 3}
+    - {fileID: 8185793832496569501, guid: 396e4e2bcb4c3374c90c240769020c51, type: 3}
+    - {fileID: 8185793832496569501, guid: 209b15dd421b315458b25e6457874d89, type: 3}
+    - {fileID: 8185793832496569501, guid: 9e065bacc309f8a4c877f23b4b5eebf8, type: 3}
+    - {fileID: 8185793832496569501, guid: 0a3312199122e69409623fdbdbe357d0, type: 3}
+    - {fileID: 8185793832496569501, guid: 43fc8139f33d4ff4c842012a7dc9fed4, type: 3}
+  treeContainer: {fileID: 745885060}
+  scatterAreaSize: {x: 80, y: 80}
+  maxAttempts: 3000
+  raycastHeight: 150
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+--- !u!114 &745885062
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 745885059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cd1ff82922f348469b23d935d76c965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  treeScatterer: {fileID: 745885061}
+  minTreeCount: 0
+  maxTreeCount: 10
+  minAllowedSpacing: 3.086
+  maxAllowedSpacing: 8.79
+  randomiseOnStart: 1
 --- !u!4 &763310333 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1231203289551544087, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
@@ -1669,7 +1753,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: localAmplitude
-      value: 0.15
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: localFrequency
@@ -1677,11 +1761,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: globalAmplitude
-      value: 0.2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8854956710488373302, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: globalFrequency
-      value: 0.05
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: 1504323780790653290, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
