@@ -546,6 +546,7 @@ MonoBehaviour:
   BlackSheepPrefab: {fileID: 5845806735159977712, guid: 974f16ec98a41ce13b8e0c0d301f8a5b, type: 3}
   FenceManager: {fileID: 341595931}
   diversity_percentage: 9.9
+  size_variation: 1
   total_sheep: 50
   spawn_radius: 20
   groundOffset: 0.05
@@ -1604,6 +1605,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 379797169725186100, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
       propertyPath: dogSpeedMultiplier
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1231203289551544087, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1231203289551544087, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1231203289551544087, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
+      propertyPath: m_LocalScale.z
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1231203289551544087, guid: 5d32a4aa8e1564708b32040a8e125df1, type: 3}
