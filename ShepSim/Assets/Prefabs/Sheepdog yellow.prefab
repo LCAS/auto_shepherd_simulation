@@ -271,7 +271,7 @@ GameObject:
   - component: {fileID: 321734983937037933}
   - component: {fileID: 379797169725186100}
   m_Layer: 0
-  m_Name: Sheepdog
+  m_Name: Sheepdog yellow
   m_TagString: Dog
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -377,9 +377,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e551fcc2491e322759043ab454617e8c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  wanderRadius: 10
   closeEnoughDistance: 1
-  runSpeedMultiplier: 1
+  stopWhenArrived: 1
+  dogSpeedMultiplier: 2
+  enableDebugLogs: 1
+  debugLogInterval: 1
 --- !u!1 &2005870832515559678
 GameObject:
   m_ObjectHideFlags: 0
@@ -628,7 +630,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: f6730b960ba6c914e9141395fc93249f, type: 2}
+  - {fileID: 2100000, guid: 5b00513326f504621a890c7ffe6a34a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

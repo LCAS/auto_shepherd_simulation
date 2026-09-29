@@ -126,6 +126,8 @@ MonoBehaviour:
   materials: []
   randomiseOnStart: 1
   materialIndex: 0
+  materialOverrideIndex: -1
+  textureTiling: {x: 50, y: 50}
 --- !u!114 &-8854956710488373302
 MonoBehaviour:
   m_ObjectHideFlags: 0

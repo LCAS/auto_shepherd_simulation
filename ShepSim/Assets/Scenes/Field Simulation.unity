@@ -1701,8 +1701,20 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 6f8776a71eb1f4d0b90aae4232f2a770, type: 2}
     - target: {fileID: 5295084877330147309, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5295084877330147309, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
+      propertyPath: randomiseOnStart
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5295084877330147309, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: materials.Array.size
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5295084877330147309, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
+      propertyPath: materialOverrideIndex
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5295084877330147309, guid: a3bee5b2ffd08d5458a00d54a6cbfaed, type: 3}
       propertyPath: 'materials.Array.data[0]'
